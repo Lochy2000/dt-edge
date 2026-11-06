@@ -1,5 +1,6 @@
-// Asset picker, recording controls and probe editor.
-// app.js polls /api/state every second and hands the result to window.onState below.
+// Shared by every page: header (asset picker, live status, clock), recording bar, probe editor.
+// Pages that poll /api/state themselves (overview.js, app.js) hand the result to window.onState;
+// on other pages (runs) this file polls it every 2 s.
 
 const $ = (sel) => document.querySelector(sel);
 let lastState = null;
@@ -66,6 +67,7 @@ $("#asset-select").addEventListener("change", async (e) => {
 // ------------------------------------------------------------- recording bar
 function drawRecArea(rec) {
   const area = $("#rec-area");
+  if (!area) return; // page without a recording bar
   if (!rec.recording) {
     area.innerHTML = `
       <input id="run-name" class="grow" placeholder="Run name, e.g. Full kettle: heat-up + cool-down" maxlength="80">
@@ -165,8 +167,21 @@ $("#probes-save").onclick = async (e) => {
 };
 
 // ------------------------------------------------------------------- wiring
+function updateLiveChip(state) {
+  // Green "Live" when every enabled sensor is live; otherwise how many need a look.
+  const chip = $("#live-chip");
+  const on = state.sensors.filter(s => s.status !== "OFF");
+  const bad = on.filter(s => s.status !== "LIVE");
+  const worst = bad.some(s => s.status === "ERROR") ? "error" : bad.length ? "stale" : "live";
+  chip.className = `live-chip ${worst}`;
+  chip.innerHTML = `<span class="dot"></span>${bad.length ? `${bad.length} of ${on.length} need a look` : "Live"}`;
+  chip.title = bad.map(s => `${s.label}: ${s.status}`).join("\n") || "All sensors live";
+}
+
 window.onState = (state) => {
   lastState = state;
+  updateLiveChip(state);
+  $("#asset-name").textContent = state.asset ? state.asset.name : "no asset";
   const rec = state.recording || { recording: false };
   if (rec.recording !== wasRecording) {
     drawRecArea(rec);
@@ -179,3 +194,18 @@ window.onState = (state) => {
 };
 
 loadAssets().catch(err => toast(err.message, true));
+
+setInterval(() => { $("#clock").textContent = new Date().toLocaleTimeString("en-GB"); }, 500);
+
+if (!window.PAGE_POLLS) {
+  const poll = async () => {
+    try {
+      const res = await fetch("/api/state", { cache: "no-store" });
+      if (!res.ok) throw new Error(res.status);
+      $("#banner").hidden = true;
+      window.onState(await res.json());
+    } catch (e) { $("#banner").hidden = false; }
+  };
+  poll();
+  setInterval(poll, 2000);
+}

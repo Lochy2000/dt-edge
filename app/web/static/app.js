@@ -1,5 +1,6 @@
-// Polls /api/state once a second and builds one card per sensor automatically.
+// Sensors page: polls /api/state once a second and builds one card per sensor automatically.
 // A new sensor in sensors.yaml appears here with no front-end changes.
+window.PAGE_POLLS = true; // tells controls.js this page fetches the state itself
 
 const STATUS_COLOUR = {
   LIVE: "var(--live)", STALE: "var(--stale)", ERROR: "var(--error)",
@@ -125,8 +126,5 @@ async function tick() {
   }
 }
 
-setInterval(() => {
-  document.getElementById("clock").textContent = new Date().toLocaleTimeString("en-GB");
-}, 500);
 setInterval(tick, 1000);
 tick();

@@ -126,9 +126,25 @@ Each sensor runs in its own thread. If a read fails 3 times in a row, that senso
 
 ---
 
+## The dashboard pages
+
+| Page | What it's for |
+|---|---|
+| **Overview** | The rig at a glance, for the object under test: power & energy, one thermal camera, probe temperatures over time with heating rate, room air, and a picture of the object with live probe dots. Each panel has **Open details** (big graph, min/max/mean, CSV of the time shown) |
+| **Sensors** | Every sensor as a card with its status: the health check when setting up or debugging |
+| **Recorded runs** | Downloads for every recorded test |
+
+The header shows the asset (object under test), **Probes…**, a **Live** indicator (amber/red with a count when a sensor needs a look; click it for the Sensors page) and, on Overview, the time range for the graphs (5–60 min, kept in memory on the Pi).
+
+**Placing probes on the picture:** Overview → **Upload picture** (a photo of the setup works best) → **Move probes** → drag each dot to where the thermocouple is → **Save positions**. Dots use the same colours as the graph lines.
+
+**No hardware / demo fallback:** `./run.sh --config demo.yaml` runs simulated sensors with the same names as the rig (thermocouples, plug switching ~2.9 kW, room air, camera), so the whole dashboard works with nothing plugged in.
+
+The graphs use [uPlot](https://github.com/leeoniya/uPlot) (MIT), stored in `app/web/static/vendor/` so nothing is loaded from the internet.
+
 ## Recording a test run
 
-1. Pick the **Asset** (the object under test) in the bar under the header. Use **Probes…** to tick which thermocouples are on it and name them (Water, Lid, ...).
+1. Pick the **Asset** (the object under test) in the header. Use **Probes…** to tick which thermocouples are on it and name them (Water, Lid, ...).
 2. Type a run name (and notes), leave **save thermal images** ticked if you want them, and press **Start recording**.
 3. While it runs, type a **marker** and press Enter for anything worth noting ("kettle switched off", "lid opened"). Plug on/off changes are logged automatically.
 4. Press **Stop**. Then open **Recorded runs** to download it.
@@ -149,14 +165,14 @@ Runs are saved on the Pi in `data/runs/<date-time>_<name>/`. Energy per run is w
 - **New object:** Asset dropdown → **+ New asset…** (starts as a copy of the current one) → **Probes…** to tick and name its probes.
 - **Adding a thermocouple:** plug it into a free TC-08 socket, add the socket number to `channels:` in `sensors.yaml`, restart. It then appears in **Probes…** as `tc08.chN`.
 - Profiles are kept in `data/assets/*.json`. `data/` isn't in Git, so dashboard edits never clash with `git pull`. The example in `assets_default/` is copied in on first start.
-- Each probe also has a position on a picture of the object (x, y in %). Placing them on the dashboard comes with the new layout.
+- Each probe also has a position on a picture of the object (x, y in %), set by dragging the dots on the Overview.
 
 The asset can't be changed during a recording: the run saves the probe labels it started with.
 
 ## Not built yet (deliberately)
 
-- Graphs (the last hour is already kept in memory and served at `/api/history`; the new layout will chart it)
-- Placing probe dots on a picture of the object
+- Markers and run start/stop drawn on the graphs
+- Replaying a recorded run on the Overview (for now, open its Excel CSV)
 - Publishing to MQTT / the v0.1 gateway
 - Switching the Tapo plug. Control needs its own safety rules (operator enable, fail-safe off on stale data, logging) first
 - Docker packaging

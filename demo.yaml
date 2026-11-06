@@ -1,22 +1,31 @@
-# No-hardware config: runs only simulated sensors.
-# Useful on a laptop:  python -m app.main --config demo.yaml
-site: laptop
+# No-hardware config: simulated sensors only, with the SAME ids as the real rig,
+# so the kettle asset (probes tc08.ch1-4, plug, ambient, lepton) works unchanged.
+#   laptop:  python -m app.main --config demo.yaml
+#   Pi:      ./run.sh --config demo.yaml     (demo fallback if hardware misbehaves)
+site: demo
 
 sensors:
-  - id: sim_camera
+  - id: lepton
     type: simulated
     label: Simulated thermal camera
     image: true
     smooth: true
     poll_s: 0.5
 
-  - id: sim_tc
+  - id: tc08
     type: simulated
     label: Simulated thermocouples
-    channels: 4           # sim_tc.ch1 ... sim_tc.ch4
+    channels: 4           # tc08.ch1 ... tc08.ch4
     poll_s: 1
 
   - id: plug
-    type: tapo_p110
-    label: Smart plug · Tapo P110
-    enabled: false
+    type: simulated
+    mode: plug            # ~2.9 kW load: 2 min on, 3 min off
+    label: Simulated smart plug
+    poll_s: 2
+
+  - id: ambient
+    type: simulated
+    mode: ambient
+    label: Simulated room air
+    poll_s: 2

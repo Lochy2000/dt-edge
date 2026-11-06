@@ -3,7 +3,8 @@
 One run = one folder in data/runs/, e.g. data/runs/20261106-141502_kettle-heat-up/
     meta.json      what was tested: name, notes, start/end, the asset profile (probe labels
                    and positions), the sensor config, and a summary (energy used, min/max per point)
-    readings.csv   EVERY reading as it arrived, one row per value (long format):
+    readings.csv   every reading as it arrived, one row per value (long format; camera
+                   max/mean/min are kept at 2 per second, everything else in full):
                    time (UTC), t_s (seconds since start), point_id, label, value, unit, quality, qc
     events.csv     start/stop, markers you add ("lid opened"), and plug on/off changes
     frames/        optional: one thermal image per second per camera, as compressed NumPy files
@@ -11,6 +12,7 @@ One run = one folder in data/runs/, e.g. data/runs/20261106-141502_kettle-heat-u
 
 Exports (made on request from readings.csv, see server.py):
     wide CSV       one row per second, one column per sensor: easiest to open in Excel
+                   (slower sensors' last value is repeated for up to 5 s to fill the gaps)
     zip            the whole folder
 
 Safety: one run at a time; refuses to start with < 500 MB free; stops itself after
@@ -41,6 +43,8 @@ CSV_FIELDS = ["time", "t_s", "point_id", "label", "value", "unit", "quality", "q
 MIN_FREE_BYTES = 500 * 1024 * 1024
 FLUSH_EVERY_S = 2.0
 FRAME_INTERVAL_S = 1.0
+CAMERA_SUMMARY_INTERVAL_S = 0.5  # camera max/mean/min: 2 rows/s is plenty (full images are saved separately)
+WIDE_FILL_S = 5  # wide CSV: repeat a sensor's last value for up to 5 s (sensors that report every 2 s)
 FRAMES_PER_FILE = 60  # one .npz per minute per camera
 UNIT_TEXT = {"DEG_C": "degC", "PERCENT_RH": "%RH", "HectoPA": "hPa", "W": "W", "KiloW-HR": "kWh"}  # for spreadsheet headers
 
@@ -109,6 +113,8 @@ class Recorder:
                 "stats": {},  # point_id -> {label, unit, min, max, first, last}
                 "frames_on": bool(frames), "frame_buf": {}, "frame_last": {}, "frame_files": {},
                 "n_frames": 0, "markers": 0,
+                "cameras": set(),     # sensor ids that send images (learnt from on_frame)
+                "last_written": {},   # point_id -> t of last row written (camera throttle)
             }
             self._run["w"].writerow(CSV_FIELDS)
             self._run["evw"].writerow(["time", "t_s", "event"])
@@ -180,10 +186,14 @@ class Recorder:
                 pid, value = m["point_id"], m["value"]
                 t = _epoch(m["sensor_time"])
                 label = r["labels"].get(pid) or m.get("label") or pid
+                self._update_stats(r, pid, label, m.get("unit"), value)
+                if pid.split(".", 1)[0] in r["cameras"]:
+                    if t - r["last_written"].get(pid, 0) < CAMERA_SUMMARY_INTERVAL_S:
+                        continue  # camera summaries arrive ~9/s; keep 2/s
+                    r["last_written"][pid] = t
                 r["w"].writerow([m["sensor_time"], round(t - r["t0"], 3), pid, label, _csv_value(value),
                                  m.get("unit") or "", m.get("quality") or "", ";".join(m.get("qc") or [])])
                 r["rows"] += 1
-                self._update_stats(r, pid, label, m.get("unit"), value)
                 if pid == r["power_point"]:
                     self._integrate_power(r, t, value)
                 if pid == r["state_point"] and value is not None and value != r["last_state"]:
@@ -201,7 +211,10 @@ class Recorder:
     def on_frame(self, point_id: str, data: np.ndarray, t: float) -> None:
         with self._lock:
             r = self._run
-            if not r or not r["frames_on"] or t - r["frame_last"].get(point_id, 0) < FRAME_INTERVAL_S:
+            if not r:
+                return
+            r["cameras"].add(point_id.split(".", 1)[0])
+            if not r["frames_on"] or t - r["frame_last"].get(point_id, 0) < FRAME_INTERVAL_S:
                 return
             r["frame_last"][point_id] = t
             r["frame_buf"].setdefault(point_id, []).append((t, data.astype(np.float16)))
@@ -242,7 +255,12 @@ class Recorder:
         return bool(self._run and self._run["id"] == run_id)
 
     def wide_csv(self, run_id: str) -> str:
-        """One row per second, one column per point (last value in each second)."""
+        """One row per second, one column per point (last value in each second).
+
+        Sensors slower than 1/s (plug, room air: every 2 s) would leave every other row blank,
+        which breaks spreadsheet line charts, so their last value is repeated for up to
+        WIDE_FILL_S seconds. Longer gaps stay blank so real dropouts remain visible.
+        """
         d = self.run_dir(run_id)
         columns: dict[str, str] = {}   # point_id -> header, in order of first appearance
         rows: dict[int, dict] = {}     # whole second -> {point_id: value}
@@ -256,9 +274,19 @@ class Recorder:
                 rows.setdefault(sec, {})[pid] = rec["value"]
         t0 = _epoch(json.loads((d / "meta.json").read_text())["started"])
         lines = [["time", "t_s", *columns.values()]]
+        last: dict[str, tuple[int, str]] = {}  # point_id -> (second, value) last seen
         for sec in sorted(rows):
             iso = datetime.fromtimestamp(t0 + sec, timezone.utc).isoformat(timespec="seconds")
-            lines.append([iso, sec, *(rows[sec].get(pid, "") for pid in columns)])
+            row = []
+            for pid in columns:
+                if pid in rows[sec]:
+                    last[pid] = (sec, rows[sec][pid])
+                    row.append(rows[sec][pid])
+                elif pid in last and sec - last[pid][0] <= WIDE_FILL_S:
+                    row.append(last[pid][1])  # slower sensor: carry its last value forward
+                else:
+                    row.append("")            # no data for longer than WIDE_FILL_S: a real gap
+            lines.append([iso, sec, *row])
         out = []
         w = csv.writer(_ListWriter(out))
         w.writerows(lines)

@@ -1,27 +1,11 @@
-<!doctype html>
-<html lang="en">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Recorded runs · DT-TEO Edge Rig</title>
-  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
-</head>
-<body>
-  <header class="topbar">
-    <div class="brand">
-      <span class="brand-mark"></span>
-      <div>
-        <h1>Recorded runs</h1>
-        <p class="sub">Site {{ site }} · saved on the Pi's SD card</p>
-      </div>
-    </div>
-    <a class="btn ghost" href="/">← Live dashboard</a>
-  </header>
-
+{% extends "base.html" %}
+{% block title %}Recorded runs · DT-TEO Edge Rig{% endblock %}
+{% block controlbar %}{% endblock %}
+{% block content %}
   <main class="runs">
     <p class="dim small">
       <b>Excel CSV</b>: one row per second, one column per sensor (easiest to chart).
-      <b>All readings</b>: every value exactly as it arrived.
+      <b>All readings</b>: every value as it arrived.
       <b>Zip</b>: everything, including thermal images and the run's setup (meta.json).
     </p>
     <table class="runs-table">
@@ -31,7 +15,7 @@
       <tbody id="runs-body"><tr><td colspan="8" class="dim">Loading…</td></tr></tbody>
     </table>
   </main>
-
+{% endblock %}
+{% block scripts %}
   <script src="{{ url_for('static', filename='runs.js') }}"></script>
-</body>
-</html>
+{% endblock %}

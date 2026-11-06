@@ -77,10 +77,10 @@ class Store:
                 self.history.add(msg["point_id"], t, msg["value"])
         for listener in self.listeners:
             try:
+                for fr in frames:  # frames first, so the recorder knows which sensors are cameras
+                    listener.on_frame(fr.point_id, fr.data, fr.sensor_time.timestamp())
                 if msgs:
                     listener.on_readings([m for m, _ in msgs])
-                for fr in frames:
-                    listener.on_frame(fr.point_id, fr.data, fr.sensor_time.timestamp())
             except Exception:  # noqa: BLE001 - a recorder problem must not stop the sensor
                 log.exception("listener %s failed", type(listener).__name__)
 

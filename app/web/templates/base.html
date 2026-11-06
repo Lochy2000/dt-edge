@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}DT-TEO Edge Rig{% endblock %}</title>
+  <link rel="icon" href="data:,">
+  <link rel="stylesheet" href="{{ url_for('static', filename='vendor/uPlot.min.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body class="page-{{ page }}">
+  <!-- Shared header: page tabs, asset (object under test), live status, clock -->
+  <header class="topbar">
+    <div class="brand">
+      <span class="brand-mark"></span>
+      <div>
+        <h1>DT-TEO Edge Rig</h1>
+        <p class="sub">Site {{ site }} / <span id="asset-name">…</span></p>
+      </div>
+    </div>
+    <nav class="tabs">
+      <a href="/" class="{{ 'on' if page == 'overview' }}">Overview</a>
+      <a href="/sensors" class="{{ 'on' if page == 'sensors' }}">Sensors</a>
+      <a href="/runs" class="{{ 'on' if page == 'runs' }}">Recorded runs</a>
+    </nav>
+    <div class="head-tools">
+      {% block head_tools %}{% endblock %}
+      <select id="asset-select" title="Object under test"></select>
+      <button class="btn ghost" id="probes-btn" type="button">Probes…</button>
+      <a class="live-chip" id="live-chip" href="/sensors" title="Sensor status">…</a>
+      <div class="clock" id="clock">--:--:--</div>
+    </div>
+  </header>
+
+  {% block controlbar %}
+  <!-- Recording: see controls.js -->
+  <section class="controlbar">
+    <div class="ctl-group rec-area" id="rec-area"></div>
+  </section>
+  {% endblock %}
+
+  <div class="banner" id="banner" hidden>Lost connection to the Pi. Retrying…</div>
+  <div class="toast" id="toast" hidden></div>
+
+  {% block content %}{% endblock %}
+
+  <!-- Probe editor: which temperature probes are on this asset, and what they're called -->
+  <dialog id="probes-dialog">
+    <form method="dialog" class="dlg">
+      <h2>Probes on <span id="probes-asset"></span></h2>
+      <p class="dlg-sub">Tick the temperature probes placed on this object and name them. Names appear on the cards and in recordings.
+        A channel only lists here once it's in <code>sensors.yaml</code>. Drag the dots on the Overview picture to place them.</p>
+      <table class="probe-table">
+        <thead><tr><th>Use</th><th>Channel</th><th>Name</th><th>Now</th></tr></thead>
+        <tbody id="probes-body"></tbody>
+      </table>
+      <div class="dlg-actions">
+        <button class="btn ghost" value="cancel">Cancel</button>
+        <button class="btn primary" id="probes-save" value="save">Save</button>
+      </div>
+    </form>
+  </dialog>
+
+  {% block scripts %}{% endblock %}
+  <script src="{{ url_for('static', filename='controls.js') }}"></script>
+</body>
+</html>

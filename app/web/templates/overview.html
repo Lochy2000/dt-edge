@@ -1,0 +1,117 @@
+{% extends "base.html" %}
+{% block head_tools %}
+  <select id="range-select" title="Time shown on the graphs">
+    <option value="5">Last 5 minutes</option>
+    <option value="15">Last 15 minutes</option>
+    <option value="30" selected>Last 30 minutes</option>
+    <option value="60">Last 60 minutes</option>
+  </select>
+{% endblock %}
+
+{% block content %}
+<!-- Built by overview.js. Each panel reads the ACTIVE ASSET to know which sensors it shows,
+     so the same page works for a kettle, a toaster, ... -->
+<main class="ov-grid">
+
+  <!-- Power & energy: from the asset's "power" and "state" points (the smart plug) -->
+  <section class="panel" id="p-power">
+    <div class="panel-head">
+      <h2>Power &amp; energy</h2><span class="pstat" data-for="power"></span>
+      <button class="link" data-details="power" type="button">Open details ↗</button>
+    </div>
+    <div class="tiles three">
+      <div class="tile"><span class="t-label">Current power</span><b class="t-value" id="power-now">—</b></div>
+      <div class="tile"><span class="t-label" id="energy-label">Energy</span><b class="t-value" id="energy-now">—</b></div>
+      <div class="tile"><span class="t-label">Plug</span><b class="t-value" id="state-now">—</b></div>
+    </div>
+    <div class="chart-title">Electrical power <small>W</small></div>
+    <div class="chart" id="ch-power"></div>
+    <div class="chart-title">Energy, cumulative over the time shown <small>Wh</small></div>
+    <div class="chart short" id="ch-energy"></div>
+  </section>
+
+  <!-- Thermal camera: one camera at a time, chosen in the dropdown -->
+  <section class="panel" id="p-thermal">
+    <div class="panel-head">
+      <h2>Thermal camera</h2><span class="pstat" data-for="camera"></span>
+      <select id="cam-select" title="Camera"></select>
+      <button class="icon-btn" id="cam-full" type="button" title="Full screen">⤢</button>
+    </div>
+    <div class="thermal" id="thermal-box">
+      <div class="frame"><img id="cam-img" alt="thermal image"><div class="frame-msg" id="cam-msg" hidden></div></div>
+      <div class="scale"><span class="hi" id="cam-hi">--</span><div class="bar"></div><span class="lo" id="cam-lo">--</span></div>
+    </div>
+    <div class="tiles three">
+      <div class="tile"><span class="t-label">Min</span><b class="t-value" id="cam-min">—</b></div>
+      <div class="tile"><span class="t-label">Mean</span><b class="t-value" id="cam-mean">—</b></div>
+      <div class="tile"><span class="t-label">Max</span><b class="t-value" id="cam-max">—</b></div>
+    </div>
+  </section>
+
+  <!-- Thermal response: every probe on the asset over time -->
+  <section class="panel" id="p-response">
+    <div class="panel-head">
+      <h2>Thermal response</h2><span class="pstat" data-for="probes"></span>
+      <button class="link" data-details="response" type="button">Open details ↗</button>
+    </div>
+    <div class="legend" id="temps-legend"></div>
+    <div class="chart tall" id="ch-temps"></div>
+    <div class="tile wide-tile">
+      <span class="t-label" id="rate-label">Heating rate</span><b class="t-value" id="rate-now">—</b>
+      <span class="t-hint">slope of the last 60 s</span>
+    </div>
+  </section>
+
+  <!-- Environment & asset: room conditions + where the probes sit on the object -->
+  <section class="panel" id="p-env">
+    <div class="panel-head">
+      <h2>Environment &amp; asset</h2><span class="pstat" data-for="ambient"></span>
+      <button class="link" data-details="env" type="button">Open details ↗</button>
+    </div>
+    <div class="env">
+      <div class="env-tiles" id="env-tiles"></div>
+      <div class="asset-side">
+        <div class="asset-pic" id="asset-pic">
+          <img id="asset-img" alt="" hidden>
+          <svg id="asset-placeholder" viewBox="0 0 400 300" aria-hidden="true">
+            <rect x="120" y="50" width="160" height="200" rx="18" fill="none" stroke="currentColor" stroke-width="2"/>
+            <line x1="120" y1="90" x2="280" y2="90" stroke="currentColor" stroke-width="1.5" stroke-dasharray="4 4"/>
+            <text x="200" y="285" text-anchor="middle" fill="currentColor" font-size="13">Upload a photo of the setup to place the probes</text>
+          </svg>
+          <div id="dots"></div>
+        </div>
+        <div class="asset-tools">
+          <button class="btn ghost" id="move-btn" type="button">Move probes</button>
+          <button class="btn primary" id="move-save" type="button" hidden>Save positions</button>
+          <button class="btn ghost" id="move-cancel" type="button" hidden>Cancel</button>
+          <button class="btn ghost" id="img-btn" type="button">Upload picture</button>
+          <input type="file" id="img-input" accept="image/png,image/jpeg,image/webp" hidden>
+        </div>
+      </div>
+    </div>
+  </section>
+</main>
+
+<!-- "Open details": a bigger graph, stats for the time shown, and a CSV of it -->
+<dialog id="details-dialog" class="wide-dialog">
+  <div class="dlg">
+    <div class="dlg-head">
+      <h2 id="details-title"></h2>
+      <span class="dim small" id="details-range"></span>
+      <button class="btn ghost" id="details-csv" type="button">Download CSV</button>
+      <button class="btn ghost" id="details-close" type="button">Close</button>
+    </div>
+    <div class="chart big" id="details-chart"></div>
+    <table class="stats-table">
+      <thead><tr><th>Sensor</th><th>Now</th><th>Min</th><th>Max</th><th>Mean</th><th>Point</th></tr></thead>
+      <tbody id="details-stats"></tbody>
+    </table>
+  </div>
+</dialog>
+{% endblock %}
+
+{% block scripts %}
+  <script src="{{ url_for('static', filename='vendor/uPlot.iife.min.js') }}"></script>
+  <script src="{{ url_for('static', filename='charts.js') }}"></script>
+  <script src="{{ url_for('static', filename='overview.js') }}"></script>
+{% endblock %}

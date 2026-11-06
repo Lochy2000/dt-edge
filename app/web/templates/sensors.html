@@ -1,0 +1,11 @@
+{% extends "base.html" %}
+{% block title %}Sensors · DT-TEO Edge Rig{% endblock %}
+{% block content %}
+  <!-- Every sensor as a card with its status: the health-check view. Built by app.js. -->
+  <div class="summary page-summary" id="summary"></div>
+  <main class="grid" id="grid"></main>
+  <footer class="foot">Thermal colours auto-scale per camera; compare the numbers, not the colours.</footer>
+{% endblock %}
+{% block scripts %}
+  <script src="{{ url_for('static', filename='app.js') }}"></script>
+{% endblock %}

@@ -1,5 +1,13 @@
 # Changelog
 
+## 2026-11-06 — Step 2: new Overview layout
+- **Overview page** (`overview.html`, `overview.js`, `charts.js`): four panels as in the mockup, all driven by the active asset: Power & energy (live W, energy this run / over the time shown, power and cumulative energy graphs), Thermal camera (one at a time, dropdown, full screen), Thermal response (all probes over time, heating/cooling rate of the main probe), Environment & asset (room air with sparklines, picture of the object with live, draggable probe dots). **Open details** per panel: big graph, min/max/mean, CSV of the time shown.
+- **Pages**: Overview (`/`), Sensors (`/sensors`, the old cards view), Recorded runs. Shared header/recording bar/probe editor in `base.html`; header shows a Live / "n need a look" indicator.
+- Charts: uPlot 1.6.32 (MIT) vendored in `static/vendor/`; times in 24 h UK format; power and energy axes start at 0.
+- `/api/history?since=` for live graph updates (only new points).
+- **Recordings**: Excel CSV repeats slower sensors' last value for up to 5 s (no more blank every other row); camera max/mean/min stored at 2/s instead of ~9/s.
+- **Demo fallback**: `demo.yaml` simulates the rig with the same sensor ids (thermocouples, plug ~2.9 kW 2 min on / 3 min off, room air, camera).
+
 ## 2026-11-06 — Step 1: recording, assets, short-term memory
 - **Test-run recording** (`app/recorder.py`): start/stop from the dashboard, markers, plug on/off events, optional thermal images (1/s). Saved on the SD card in `data/runs/`. Downloads: Excel CSV (1 row/s), all readings, events, zip. Run energy integrated from plug power.
 - **Asset profiles** (`app/assets.py`, `assets_default/kettle.json`): what readings mean for the object under test (probe labels and positions, power, camera). Switch, create and edit from the dashboard; stored in `data/assets/`.

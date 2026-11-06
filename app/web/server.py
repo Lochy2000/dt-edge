@@ -1,13 +1,15 @@
 """The dashboard web server.
 
 Pages
-  /                              live dashboard
+  /                              overview: power, thermal camera, probe graphs, asset picture
+  /sensors                       every sensor as a card, with its status (health check view)
   /runs                          list of recorded test runs, with downloads
 
 Live data
   GET  /api/state                latest readings + status for every sensor, recording status, active asset
   GET  /api/frame/<id>.png       latest thermal image, coloured
   GET  /api/history?points=a,b&minutes=30    recent values for graphs (from RAM)
+  GET  /api/history?points=a,b&since=<epoch> only values newer than that (for live updates)
 
 Assets (what the readings mean for the object under test)
   GET  /api/assets               all profiles + which one is active
@@ -66,11 +68,15 @@ def create_app(store, assets, recorder) -> Flask:
     # ---------------------------------------------------------------- pages
     @app.get("/")
     def index():
-        return render_template("index.html", site=store.site)
+        return render_template("overview.html", site=store.site, page="overview")
+
+    @app.get("/sensors")
+    def sensors_page():
+        return render_template("sensors.html", site=store.site, page="sensors")
 
     @app.get("/runs")
     def runs_page():
-        return render_template("runs.html", site=store.site)
+        return render_template("runs.html", site=store.site, page="runs")
 
     # ------------------------------------------------------------ live data
     @app.get("/api/state")
@@ -93,6 +99,8 @@ def create_app(store, assets, recorder) -> Flask:
     @app.get("/api/history")
     def history():
         points = [p for p in request.args.get("points", "").split(",") if p][:30]
+        if "since" in request.args:  # live update: just what's new (exclusive of `since`)
+            return jsonify(store.history.get(points, float(request.args["since"]) + 0.001))
         minutes = min(max(float(request.args.get("minutes", 30)), 1), 60)
         return jsonify(store.history.get(points, time.time() - minutes * 60))
 
