@@ -12,12 +12,22 @@ const Diagram = (() => {
   const esc = (s) => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 
   // Built-in drawings (centred, leaving room for the label columns either side)
-  const DRAWINGS = {
-    kettle: `
-      <path class="dg-water" d="M211 150 L349 150 L360 297 L200 297 Z"/>
+
+  // Kettle: the inside runs from y=112 (top) to y=298 (bottom) and widens slightly towards
+  // the bottom, so the water's edges follow the walls. level = % full (0-100).
+  function kettle(level) {
+    const TOP = 112, BOTTOM = 298;
+    const y = BOTTOM - (Math.min(Math.max(level, 0), 100) / 100) * (BOTTOM - TOP);
+    const left = (yy) => 214 - ((yy - TOP) * 14) / (BOTTOM - TOP) + 2;   // inner wall x at height yy
+    const right = (yy) => 346 + ((yy - TOP) * 14) / (BOTTOM - TOP) - 2;
+    const water = level > 0
+      ? `<path class="dg-water" d="M${left(y)} ${y} L${right(y)} ${y} L${right(BOTTOM - 1)} ${BOTTOM - 1} L${left(BOTTOM - 1)} ${BOTTOM - 1} Z"/>
+         <line class="dg-level" x1="${left(y)}" y1="${y}" x2="${right(y)}" y2="${y}"/>
+         <text class="dg-caption" x="${right(y) - 6}" y="${y - 6}" text-anchor="end">water ${Math.round(level)}%</text>`
+      : `<text class="dg-caption" x="280" y="290" text-anchor="middle">empty</text>`;
+    return `${water}
       <g class="dg-line">
         <path d="M200 298 L214 112 Q216 100 228 100 L332 100 Q344 100 346 112 L360 298 Z"/>
-        <line class="dg-level" x1="212" y1="150" x2="348" y2="150"/>
         <rect x="222" y="86" width="116" height="14" rx="5"/>
         <rect x="268" y="74" width="24" height="12" rx="4"/>
         <path d="M213 122 L168 99 Q158 94 162 105 L209 158"/>
@@ -25,18 +35,21 @@ const Diagram = (() => {
         <path d="M348 142 C 390 142 390 244 355 244"/>
         <rect x="184" y="300" width="192" height="16" rx="6"/>
       </g>
-      <text class="dg-caption" x="342" y="144" text-anchor="end">water level</text>
-      <text class="dg-caption" x="280" y="333" text-anchor="middle">base</text>`,
-    generic: `
-      <g class="dg-line"><rect x="190" y="60" width="180" height="236" rx="16"/></g>
-      <text class="dg-caption" x="280" y="320" text-anchor="middle">object under test</text>`,
-  };
+      <text class="dg-caption" x="280" y="333" text-anchor="middle">base</text>`;
+  }
 
-  function drawing(g, kind, imageUrl) {
+  const GENERIC = `
+      <g class="dg-line"><rect x="190" y="60" width="180" height="236" rx="16"/></g>
+      <text class="dg-caption" x="280" y="320" text-anchor="middle">object under test</text>`;
+
+  // opts.waterLevel: % full, for the kettle drawing
+  function drawing(g, kind, imageUrl, opts = {}) {
     if (kind === "photo" && imageUrl) {
       g.innerHTML = `<image href="${esc(imageUrl)}" x="0" y="0" width="${W}" height="${H}" preserveAspectRatio="xMidYMid meet"/>`;
+    } else if (kind === "kettle") {
+      g.innerHTML = kettle(opts.waterLevel ?? 60);
     } else {
-      g.innerHTML = DRAWINGS[kind] || DRAWINGS.generic;
+      g.innerHTML = GENERIC;
     }
   }
 

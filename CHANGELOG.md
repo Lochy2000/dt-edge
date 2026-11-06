@@ -1,5 +1,16 @@
 # Changelog
 
+## 2026-11-06 — Overview scales with the screen
+- **Everything scales together**: all sizes are in `rem`, and on the Overview 1rem follows the window size (`max(12.5px, min(0.74vw, 1.6vh))`), so zooming in/out or a bigger/smaller screen keeps the same proportions; graph text and tick spacing follow it (charts rebuild when the scale changes).
+- **Fits one screen down to ~1000 x 480** (CSS px): slimmer header, tighter panels, single-line tiles on short screens.
+- **Energy graph back** under the power graph (shared time axis); plug state is a badge in the panel header.
+- **Thermal image** keeps the camera's 4:3 shape, fills the panel height, scale bar beside it (no black bars).
+- "Open details" → "Details ↗" (no longer overflows narrow panels). **Upload photo** moved into the drawing dropdown ("Upload new photo…").
+- `style.css` overview section rewritten as one block (old overrides removed).
+
+## 2026-11-06 — Adjustable water level
+- **Water level slider** under the kettle drawing (0–100 % in 5 % steps): the water line and fill move live and follow the kettle walls; saved to the asset (`water_level`) when released, so each recording's `meta.json` records how full the kettle was. Locked during a recording; hidden for the generic outline and photo.
+
 ## 2026-11-06 — Kettle drawing next to the probe graph
 - The asset drawing moved into **Thermal response**, beside the probe graph, so each line sits next to its dot. Layout: Power | Thermal camera on top; Thermal response (graph + drawing) | Environment (narrow column) below.
 - Environment trend lines fill their tiles; fixed them being clipped at the bottom.

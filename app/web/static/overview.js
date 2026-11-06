@@ -134,7 +134,8 @@ window.PAGE_POLLS = true; // tells controls.js this page fetches the state itsel
     envSig = "";
     if (!asset) return;
 
-    charts.power = Charts.lineChart($("#ch-power"), [{ label: "Power", color: "#58a6ff", unit: "W", dp: 0, fill: true }], { zero: true });
+    charts.power = Charts.lineChart($("#ch-power"), [{ label: "Power", color: "#58a6ff", unit: "W", dp: 0, fill: true }], { zero: true, noXAxis: true });
+    charts.energy = Charts.lineChart($("#ch-energy"), [{ label: "Energy", color: "#a371f7", unit: "Wh", dp: 1 }], { zero: true });
     charts.temps = Charts.lineChart($("#ch-temps"),
       asset.probes.map((p, i) => ({ label: p.label, color: probeColor(i), unit: "°C" })));
 
@@ -142,6 +143,7 @@ window.PAGE_POLLS = true; // tells controls.js this page fetches the state itsel
       ? asset.probes.map((p, i) => `<span class="lg"><i style="background:${probeColor(i)}"></i>${esc(p.label)} <b data-lg="${esc(p.point)}">—</b></span>`).join("")
       : `<span class="dim small">No probes on this asset yet. Use <b>Probes…</b> to add them.</span>`;
 
+    syncWaterControl();
     const sel = $("#drawing-select");
     sel.value = asset.drawing || "generic";
     sel.querySelector('option[value="photo"]').disabled = !asset.image;
@@ -170,6 +172,7 @@ window.PAGE_POLLS = true; // tells controls.js this page fetches the state itsel
       const [xs, w] = Charts.align(hist, [asset.power]);
       charts.power.setData([xs, w]);
       const e = Charts.cumulativeWh(xs, w);
+      charts.energy.setData([xs, e]);
       lastEnergyWh = e.length ? e[e.length - 1] : null;
     }
     charts.temps.setData(Charts.align(hist, asset.probes.map(p => p.point)));
@@ -200,7 +203,9 @@ window.PAGE_POLLS = true; // tells controls.js this page fetches the state itsel
     if (asset) {
       const pw = points[asset.power], st = points[asset.state];
       $("#power-now").innerHTML = pw ? fmt(pw.value, pw.unit) : "—";
-      $("#state-now").innerHTML = st ? fmt(st.value) : "—";
+      const stEl = $("#state-now");
+      stEl.textContent = `PLUG ${st ? fmt(st.value) : "—"}`;
+      stEl.classList.toggle("on", !!(st && st.value === true));
       if (rec.recording && rec.energy_wh != null) {
         $("#energy-label").textContent = "Energy this run";
         $("#energy-now").innerHTML = fmtWh(rec.energy_wh);
@@ -225,6 +230,7 @@ window.PAGE_POLLS = true; // tells controls.js this page fetches the state itsel
         if (p) el.textContent = p.label;
       }
       if (dragIndex === null) renderOverlay();
+      syncWaterControl();
     }
     renderCamera();
   }
@@ -275,11 +281,33 @@ window.PAGE_POLLS = true; // tells controls.js this page fetches the state itsel
   // ------------------------------------------------ asset drawing + probe dots
   const svg = $("#diagram");
 
-  function renderDrawing() {
+  function renderDrawing(level) {
     const url = asset && asset.image ? `/api/assets/${encodeURIComponent(asset.id)}/image?v=${Date.now()}` : null;
-    Diagram.drawing($("#dg-drawing"), asset ? asset.drawing : "generic", url);
+    const waterLevel = level ?? (asset ? asset.water_level : 60);
+    Diagram.drawing($("#dg-drawing"), asset ? asset.drawing : "generic", url, { waterLevel });
     renderOverlay();
   }
+
+  // Water level slider (kettle drawing only): moves the water live, saves when you let go.
+  const waterRange = $("#water-range");
+  function syncWaterControl() {
+    const isKettle = asset && asset.drawing === "kettle";
+    $("#water-ctl").hidden = !isKettle;
+    if (!isKettle) return;
+    const level = asset.water_level ?? 60;
+    if (document.activeElement !== waterRange) waterRange.value = level;
+    $("#water-val").textContent = `${Math.round(waterRange.value)}%`;
+    waterRange.disabled = !!(state && state.recording && state.recording.recording);
+  }
+  waterRange.oninput = () => {
+    $("#water-val").textContent = `${waterRange.value}%`;
+    Diagram.drawing($("#dg-drawing"), "kettle", null, { waterLevel: Number(waterRange.value) });
+  };
+  waterRange.onchange = async () => {
+    try {
+      await api("PUT", `/api/assets/${encodeURIComponent(asset.id)}`, { ...asset, water_level: Number(waterRange.value) });
+    } catch (err) { toast(err.message, true); waterRange.value = asset.water_level; renderDrawing(); }
+  };
 
   function renderOverlay() {
     if (!asset) return;
@@ -335,12 +363,16 @@ window.PAGE_POLLS = true; // tells controls.js this page fetches the state itsel
   };
 
   $("#drawing-select").onchange = async (e) => {
+    if (e.target.value === "__upload") {   // "Upload new photo…": pick a file, keep the current drawing until it's uploaded
+      e.target.value = asset.drawing;
+      $("#img-input").click();
+      return;
+    }
     try {
       await api("PUT", `/api/assets/${encodeURIComponent(asset.id)}`, { ...asset, drawing: e.target.value });
     } catch (err) { toast(err.message, true); e.target.value = asset.drawing; }
   };
 
-  $("#img-btn").onclick = () => $("#img-input").click();
   $("#img-input").onchange = async (e) => {
     const file = e.target.files[0];
     e.target.value = "";
@@ -417,6 +449,18 @@ window.PAGE_POLLS = true; // tells controls.js this page fetches the state itsel
   const rangeSel = $("#range-select");
   rangeSel.value = String(rangeMin);
   rangeSel.onchange = () => { rangeMin = Number(rangeSel.value); store.set("dt.range", rangeMin); loadHistory(true); };
+
+  let builtAtRem = Charts.rem();
+  let resizeTimer = null;
+  window.addEventListener("resize", () => {
+    clearTimeout(resizeTimer);
+    resizeTimer = setTimeout(() => {
+      if (Math.abs(Charts.rem() - builtAtRem) / builtAtRem > 0.08 && asset) {
+        builtAtRem = Charts.rem();
+        assetSig = ""; // next tick rebuilds the charts at the new text size
+      }
+    }, 300);
+  });
 
   tickState();
   setInterval(tickState, 1000);

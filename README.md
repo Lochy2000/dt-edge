@@ -130,13 +130,13 @@ Each sensor runs in its own thread. If a read fails 3 times in a row, that senso
 
 | Page | What it's for |
 |---|---|
-| **Overview** | The rig at a glance on one screen, for the object under test: power & energy, one thermal camera, probe temperatures over time with heating rate next to a 2D drawing of the object (kettle / generic / your photo) showing each probe's live reading, and all room-air readings. Each panel has **Open details** (big graph, min/max/mean, CSV of the time shown) |
+| **Overview** | The rig at a glance on one screen, for the object under test: power & energy, one thermal camera, probe temperatures over time with heating rate next to a 2D drawing of the object (kettle / generic / your photo) showing each probe's live reading, and all room-air readings. Each panel has **Details** (big graph, min/max/mean, CSV of the time shown). The page scales with the window, so it fits one screen on a laptop or a big monitor |
 | **Sensors** | Every sensor as a card with its status: the health check when setting up or debugging |
 | **Recorded runs** | Downloads for every recorded test |
 
 The header shows the asset (object under test), **Probes…**, **Record**, a **Live** indicator (amber/red with a count when a sensor needs a look; click it for the Sensors page) and, on Overview, the time range for the graphs (5–60 min, kept in memory on the Pi).
 
-**Placing probes on the drawing:** Overview → **Move probes** → drag each dot to where the thermocouple is → **Save positions**. Labels arrange themselves either side of the object; dots, lines and labels use the same colours as the graph lines. Pick **Kettle drawing**, **Generic outline** or **Uploaded photo** (after **Upload photo**) under the drawing.
+**Placing probes on the drawing:** Overview → **Move probes** → drag each dot to where the thermocouple is → **Save positions**. Labels arrange themselves either side of the object; dots, lines and labels use the same colours as the graph lines. Pick **Kettle drawing**, **Generic outline** or **Uploaded photo** in the dropdown under the drawing (**Upload new photo…** is in the same list). With the kettle drawing, the **Water** slider sets how full it is; that's saved with each recording.
 
 **No hardware / demo fallback:** `./run.sh --config demo.yaml` runs simulated sensors with the same names as the rig (thermocouples, plug switching ~2.9 kW, room air, camera), so the whole dashboard works with nothing plugged in.
 

@@ -7,6 +7,7 @@
   "ambient": ["ambient.air_temp", "ambient.humidity", "ambient.pressure"],
   "image": null,
   "drawing": "kettle",
+  "water_level": 60,
   "notes": "Example profile. Tick and name the probes in Probes..., then drag the dots to where they sit.",
   "probes": [
     {"point": "tc08.ch1", "label": "Surface top", "x": 40, "y": 38},

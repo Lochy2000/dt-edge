@@ -17,14 +17,17 @@
   <section class="panel" id="p-power">
     <div class="panel-head">
       <h2>Power &amp; energy</h2><span class="pstat" data-for="power"></span>
-      <button class="link" data-details="power" type="button">Open details ↗</button>
+      <span class="badge" id="state-now" title="Smart plug">PLUG —</span>
+      <button class="link" data-details="power" type="button">Details ↗</button>
     </div>
-    <div class="tiles three">
+    <div class="tiles">
       <div class="tile"><span class="t-label">Current power</span><b class="t-value" id="power-now">—</b></div>
       <div class="tile"><span class="t-label" id="energy-label">Energy</span><b class="t-value" id="energy-now">—</b></div>
-      <div class="tile"><span class="t-label">Plug</span><b class="t-value" id="state-now">—</b></div>
     </div>
-    <div class="chart fill" id="ch-power"></div>
+    <div class="chart-title">Electrical power (W)</div>
+    <div class="chart" id="ch-power"></div>
+    <div class="chart-title">Energy, cumulative over the time shown (Wh)</div>
+    <div class="chart" id="ch-energy"></div>
   </section>
 
   <!-- Thermal camera: one camera at a time, chosen in the dropdown -->
@@ -50,12 +53,12 @@
     <div class="panel-head">
       <h2>Thermal response</h2><span class="pstat" data-for="probes"></span>
       <span class="head-metric" title="Slope of the last 60 s of the first probe"><span id="rate-label">Heating rate</span> <b id="rate-now">—</b></span>
-      <button class="link" data-details="response" type="button">Open details ↗</button>
+      <button class="link" data-details="response" type="button">Details ↗</button>
     </div>
     <div class="response">
       <div class="response-chart">
         <div class="legend" id="temps-legend"></div>
-        <div class="chart fill" id="ch-temps"></div>
+        <div class="chart" id="ch-temps"></div>
       </div>
       <div class="asset-side">
         <!-- 2D drawing (kettle / generic / uploaded photo) with probe dots and labels: drawn in diagram.js -->
@@ -68,11 +71,13 @@
             <option value="kettle">Kettle drawing</option>
             <option value="generic">Generic outline</option>
             <option value="photo">Uploaded photo</option>
+            <option value="__upload">Upload new photo…</option>
           </select>
+          <label class="water-ctl" id="water-ctl" title="How full the kettle is (saved with each recording)">Water
+            <input type="range" id="water-range" min="0" max="100" step="5"><span id="water-val">—</span></label>
           <button class="btn ghost" id="move-btn" type="button">Move probes</button>
           <button class="btn primary" id="move-save" type="button" hidden>Save positions</button>
           <button class="btn ghost" id="move-cancel" type="button" hidden>Cancel</button>
-          <button class="btn ghost" id="img-btn" type="button" title="Use a photo of the setup instead of a drawing">Upload photo</button>
           <input type="file" id="img-input" accept="image/png,image/jpeg,image/webp" hidden>
         </div>
       </div>
@@ -83,7 +88,7 @@
   <section class="panel" id="p-env">
     <div class="panel-head">
       <h2>Environment</h2><span class="pstat" data-for="ambient"></span>
-      <button class="link" data-details="env" type="button">Open details ↗</button>
+      <button class="link" data-details="env" type="button">Details ↗</button>
     </div>
     <div class="env-tiles" id="env-tiles"></div>
   </section>

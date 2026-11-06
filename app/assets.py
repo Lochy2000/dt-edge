@@ -13,7 +13,8 @@ An asset profile says what that hardware means for this object:
         {"point": "tc08.ch1", "label": "Water", "x": 55, "y": 60},   # x, y = dot position on the drawing, in %
         ...
       ],
-      "drawing": "kettle"               # picture the dots sit on: kettle | generic | photo (uploaded)
+      "drawing": "kettle",              # picture the dots sit on: kettle | generic | photo (uploaded)
+      "water_level": 60                 # kettle drawing: how full, in % of the inside height
     }
 
 Switching to a new object = a new profile (made from the dashboard), no code changes.
@@ -162,5 +163,6 @@ class Assets:
             "image": a.get("image") if isinstance(a.get("image"), str) else None,
             "notes": str(a.get("notes") or "")[:500],
             "drawing": a.get("drawing") if a.get("drawing") in DRAWINGS else "generic",
+            "water_level": min(max(float(a.get("water_level", 60) or 0), 0.0), 100.0),
             "probes": probes,
         }

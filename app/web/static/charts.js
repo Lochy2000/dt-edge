@@ -33,21 +33,30 @@ const Charts = (() => {
     return splits.map(t => new Date(t * 1000).toLocaleTimeString("en-GB", o));
   }
 
-  // series: [{label, color, unit, dp, fill}]   opts: {height (default: fill the box), spark, legend, zero}
+  // series: [{label, color, unit, dp, fill}]   opts: {height (default: fill the box), spark, legend, zero, noXAxis}
   //   zero: y axis always starts at 0 (power, energy), so noise isn't magnified into spikes
+  // 1rem in px: the overview scales with the screen, so graph text follows it too
+  const rem = () => parseFloat(getComputedStyle(document.documentElement).fontSize) || 14;
+
   function lineChart(el, series, opts = {}) {
     const spark = !!opts.spark;
+    const r = rem();
     const axis = {
       stroke: C("--dim"),
       grid: { stroke: C("--line"), width: 1 },
-      ticks: { stroke: C("--line"), width: 1 },
-      font: "11px " + C("--sans"),
+      ticks: { stroke: C("--line"), width: 1, size: Math.round(0.35 * r) },
+      font: `${(0.75 * r).toFixed(1)}px ${C("--sans")}`,
+      size: Math.round(2.4 * r),
     };
+    // x axis: labels spaced for the text size; noXAxis = grid only (a graph directly below shows the times)
+    const xAxis = opts.noXAxis
+      ? { ...axis, size: Math.round(0.5 * r), ticks: { show: false }, values: (u, splits) => splits.map(() => ""), space: Math.round(6 * r) }
+      : { ...axis, values: timeLabels, space: Math.round(6 * r) };
     // No fixed height = fill the box (the overview's panels share out the screen height).
-    const size = () => ({ width: Math.max(el.clientWidth, 100), height: opts.height || Math.max(el.clientHeight, spark ? 20 : 80) });
+    const size = () => ({ width: Math.max(el.clientWidth, 100), height: opts.height || Math.max(el.clientHeight, spark ? 16 : 50) });
     const u = new uPlot({
       ...size(),
-      padding: spark ? [6, 2, 6, 2] : [10, 12, 0, 0],
+      padding: spark ? [6, 2, 6, 2] : [Math.round(0.7 * r), Math.round(0.85 * r), 0, 0],
       legend: { show: !!opts.legend, live: true },
       cursor: spark ? { show: false } : { drag: { x: false, y: false }, points: { size: 6 } },
       scales: {
@@ -58,15 +67,15 @@ const Charts = (() => {
           : {},
       },
       axes: spark ? [{ show: false }, { show: false }] : [
-        { ...axis, values: timeLabels },
-        { ...axis, size: 48, values: (u, vals) => vals.map(v => (Math.abs(v) >= 1000 ? v.toLocaleString() : +v.toFixed(2))) },
+        xAxis,
+        { ...axis, size: Math.round(3.2 * r), space: Math.round(2.2 * r), values: (u, vals) => vals.map(v => (Math.abs(v) >= 1000 ? v.toLocaleString() : +v.toFixed(2))) },
       ],
       series: [
         { value: (u, t) => (t == null ? "—" : new Date(t * 1000).toLocaleTimeString("en-GB")) },
         ...series.map(s => ({
           label: s.label,
           stroke: s.color,
-          width: spark ? 1.5 : 2,
+          width: spark ? 1.5 : Math.max(1.5, 0.14 * r),
           fill: s.fill ? s.color + "22" : undefined,
           spanGaps: true,            // sensors that report every 2 s still draw a continuous line
           points: { show: false },
@@ -111,5 +120,5 @@ const Charts = (() => {
     return d ? ((n * sxy - sx * sy) / d) * 60 : null;
   }
 
-  return { PALETTE, align, lineChart, cumulativeWh, ratePerMin };
+  return { PALETTE, align, lineChart, cumulativeWh, ratePerMin, rem };
 })();
