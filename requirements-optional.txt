@@ -1,0 +1,3 @@
+# Installed by setup.sh if possible; a failure here won't stop the other sensors.
+picosdk @ git+https://github.com/picotech/picosdk-python-wrappers   # TC-08
+python-kasa                                                          # Tapo P110

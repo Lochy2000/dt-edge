@@ -1,0 +1,22 @@
+# No-hardware config: runs only simulated sensors.
+# Useful on a laptop:  python -m app.main --config demo.yaml
+site: laptop
+
+sensors:
+  - id: sim_camera
+    type: simulated
+    label: Simulated thermal camera
+    image: true
+    smooth: true
+    poll_s: 0.5
+
+  - id: sim_probe
+    type: simulated
+    label: Simulated probe
+    poll_s: 1
+
+  - id: plug
+    type: tapo_p110
+    label: Smart plug · Tapo P110
+    enabled: false
+    host: 192.168.1.50

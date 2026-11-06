@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>DT-TEO Edge Rig</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <span class="brand-mark"></span>
+      <div>
+        <h1>DT-TEO Edge Rig</h1>
+        <p class="sub">Site <span id="site">{{ site }}</span> · live sensor view</p>
+      </div>
+    </div>
+    <div class="summary" id="summary"></div>
+    <div class="clock" id="clock">--:--:--</div>
+  </header>
+
+  <div class="banner" id="banner" hidden>Lost connection to the Pi. Retrying…</div>
+
+  <main class="grid" id="grid"></main>
+
+  <footer class="foot">Readings are live only and not saved. Thermal colours auto-scale per camera; compare the numbers, not the colours.</footer>
+
+  <script src="{{ url_for('static', filename='app.js') }}"></script>
+</body>
+</html>

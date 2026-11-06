@@ -1,0 +1,5 @@
+# Small pure-Python packages only. Heavy libraries (numpy, opencv, flask, yaml)
+# come from apt via setup.sh, because pip builds of them fail on the Pi.
+adafruit-blinka
+adafruit-circuitpython-bme280
+adafruit-circuitpython-mlx90640
