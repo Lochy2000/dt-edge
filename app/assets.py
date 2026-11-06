@@ -10,9 +10,10 @@ An asset profile says what that hardware means for this object:
       "thermal": "lepton.image",        # which camera to show
       "ambient": ["ambient.air_temp", "ambient.humidity"],
       "probes": [                       # thermocouples placed on this object
-        {"point": "tc08.ch1", "label": "Water", "x": 55, "y": 60},   # x, y = dot position on the picture, in %
+        {"point": "tc08.ch1", "label": "Water", "x": 55, "y": 60},   # x, y = dot position on the drawing, in %
         ...
-      ]
+      ],
+      "drawing": "kettle"               # picture the dots sit on: kettle | generic | photo (uploaded)
     }
 
 Switching to a new object = a new profile (made from the dashboard), no code changes.
@@ -29,6 +30,7 @@ import threading
 from pathlib import Path
 
 ID_RE = re.compile(r"^[a-z0-9][a-z0-9_-]{0,40}$")
+DRAWINGS = ("kettle", "generic", "photo")  # built-in 2D drawings, or the uploaded photo
 IMAGE_TYPES = {"image/png": ".png", "image/jpeg": ".jpg", "image/webp": ".webp"}
 MAX_IMAGE_BYTES = 8 * 1024 * 1024
 
@@ -51,6 +53,12 @@ class Assets:
         if not any(self.dir.glob("*.json")) and Path(defaults_dir).is_dir():
             for f in Path(defaults_dir).iterdir():
                 shutil.copy(f, self.dir / f.name)
+        # Profiles saved before drawings existed: give the kettle the kettle drawing.
+        for p in self.dir.glob("*.json"):
+            a = json.loads(p.read_text())
+            if "drawing" not in a:
+                a["drawing"] = "kettle" if a.get("id") == "kettle" else ("photo" if a.get("image") else "generic")
+                p.write_text(json.dumps(a, indent=2))
 
     # ---- reading ----
     def list(self) -> list[dict]:
@@ -111,6 +119,7 @@ class Assets:
         name = f"{asset_id}.img{IMAGE_TYPES[content_type]}"
         (self.dir / name).write_bytes(data)
         asset["image"] = name
+        asset["drawing"] = "photo"
         return self.save(asset)
 
     def image_path(self, asset_id: str) -> Path | None:
@@ -152,5 +161,6 @@ class Assets:
             "ambient": [str(x) for x in (a.get("ambient") or [])][:4],
             "image": a.get("image") if isinstance(a.get("image"), str) else None,
             "notes": str(a.get("notes") or "")[:500],
+            "drawing": a.get("drawing") if a.get("drawing") in DRAWINGS else "generic",
             "probes": probes,
         }

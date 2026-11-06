@@ -4,7 +4,8 @@
 //   every 2 s  GET /api/history  -> new points for the graphs (the first load gets the whole time range)
 //
 // Which sensors each panel shows comes from the asset profile: power/state (plug), probes
-// (thermocouples), ambient (room air), thermal (default camera). Nothing here knows about kettles.
+// (thermocouples), ambient (room air: every reading of those sensors is shown), thermal
+// (default camera), drawing (kettle / generic / photo).
 
 window.PAGE_POLLS = true; // tells controls.js this page fetches the state itself
 
@@ -29,11 +30,13 @@ window.PAGE_POLLS = true; // tells controls.js this page fetches the state itsel
     if (wh == null) return "—";
     return wh >= 1000 ? `${(wh / 1000).toFixed(2)}<small>kWh</small>` : `${wh.toFixed(1)}<small>Wh</small>`;
   }
+  const ENV_COLORS = ["#58a6ff", "#3fb950", "#e3b341", "#a371f7"];
 
   // ------------------------------------------------------------------ state
   let state = null;         // latest /api/state
   let asset = null;         // active asset profile
   let assetSig = "";        // to notice when the asset (or its probes) changes
+  let envSig = "";          // ...or the set of room-air readings
   let points = {};          // point_id -> latest message
   let sensors = {};         // sensor id -> sensor view (status, frames, ...)
   let rangeMin = Number(store.get("dt.range")) || 30;
@@ -41,16 +44,29 @@ window.PAGE_POLLS = true; // tells controls.js this page fetches the state itsel
   let lastT = 0;            // newest timestamp received
   let charts = {};          // uPlot instances
   let lastEnergyWh = null;
-  let editing = false;      // moving probe dots
+  let draft = null;         // probe positions while "Move probes" is on
+  let dragIndex = null;
   let camId = null;         // frame point shown, e.g. "lepton.image"
   let detailsKind = null, detailsChart = null;
 
   const sensorOf = (pid) => sensors[String(pid).split(".")[0]];
   const probeColor = (i) => Charts.PALETTE[i % Charts.PALETTE.length];
-  const keys = () => {
+
+  // Room air: every reading of the sensors named in asset.ambient (so pressure etc. appear too)
+  function envPoints() {
     if (!asset) return [];
-    return [...new Set([asset.power, asset.state, ...asset.probes.map(p => p.point), ...asset.ambient].filter(Boolean))];
-  };
+    const ids = [...new Set(asset.ambient.map(p => p.split(".")[0]))];
+    const out = [];
+    for (const id of ids) {
+      const s = sensors[id];
+      if (s && s.points.length) out.push(...s.points.filter(p => typeof p.value !== "boolean").map(p => p.point_id));
+      else out.push(...asset.ambient.filter(p => p.startsWith(id + ".")));
+    }
+    return out;
+  }
+  const keys = () => (asset
+    ? [...new Set([asset.power, asset.state, ...asset.probes.map(p => p.point), ...envPoints()].filter(Boolean))]
+    : []);
 
   // --------------------------------------------------------------- polling
   async function tickState() {
@@ -69,13 +85,15 @@ window.PAGE_POLLS = true; // tells controls.js this page fetches the state itsel
       sensors[s.id] = s;
       for (const p of s.points) points[p.point_id] = p;
     }
-    try { window.onState(state); } catch (err) { console.error(err); } // header + recording bar
+    try { window.onState(state); } catch (err) { console.error(err); } // header (controls.js)
     const sig = JSON.stringify(state.asset);
     if (sig !== assetSig) {
       assetSig = sig;
       asset = state.asset;
       onAssetChanged();
     }
+    const es = envPoints().join(",");
+    if (es !== envSig) { envSig = es; buildEnvTiles(); loadHistory(true); }
     renderLive();
   }
 
@@ -113,30 +131,36 @@ window.PAGE_POLLS = true; // tells controls.js this page fetches the state itsel
     charts = {};
     for (const k of Object.keys(hist)) delete hist[k];
     lastT = 0;
+    envSig = "";
     if (!asset) return;
 
-    charts.power = Charts.lineChart($("#ch-power"), [{ label: "Power", color: "#58a6ff", unit: "W", dp: 0, fill: true }], { height: 230, zero: true });
-    charts.energy = Charts.lineChart($("#ch-energy"), [{ label: "Energy", color: "#a371f7", unit: "Wh", dp: 1 }], { height: 170, zero: true });
+    charts.power = Charts.lineChart($("#ch-power"), [{ label: "Power", color: "#58a6ff", unit: "W", dp: 0, fill: true }], { zero: true });
     charts.temps = Charts.lineChart($("#ch-temps"),
-      asset.probes.map((p, i) => ({ label: p.label, color: probeColor(i), unit: "°C" })), { height: 260 });
+      asset.probes.map((p, i) => ({ label: p.label, color: probeColor(i), unit: "°C" })));
 
     $("#temps-legend").innerHTML = asset.probes.length
       ? asset.probes.map((p, i) => `<span class="lg"><i style="background:${probeColor(i)}"></i>${esc(p.label)} <b data-lg="${esc(p.point)}">—</b></span>`).join("")
       : `<span class="dim small">No probes on this asset yet. Use <b>Probes…</b> to add them.</span>`;
 
-    // room-air tiles with a sparkline each
-    $("#env-tiles").innerHTML = asset.ambient.map((pid, i) => `
+    const sel = $("#drawing-select");
+    sel.value = asset.drawing || "generic";
+    sel.querySelector('option[value="photo"]').disabled = !asset.image;
+    if (!draft) renderDrawing();
+  }
+
+  // room-air tiles, one per reading, each with a sparkline
+  function buildEnvTiles() {
+    for (const k of Object.keys(charts)) if (k.startsWith("spark")) { charts[k].destroy(); delete charts[k]; }
+    const env = envPoints();
+    $("#env-tiles").innerHTML = env.map((pid, i) => `
       <div class="tile env-tile">
-        <span class="t-label" data-elabel="${esc(pid)}">${esc(pid)}</span>
+        <span class="t-label" data-elabel="${esc(pid)}">${esc((points[pid] || {}).label || pid)}</span>
         <b class="t-value" data-eval="${esc(pid)}">—</b>
         <div class="spark" id="spark-${i}"></div>
       </div>`).join("") || `<div class="dim small">No room sensors set for this asset.</div>`;
-    asset.ambient.forEach((pid, i) => {
-      charts[`spark${i}`] = Charts.lineChart($(`#spark-${i}`), [{ label: pid, color: i ? "#3fb950" : "#58a6ff" }], { height: 36, spark: true });
+    env.forEach((pid, i) => {
+      charts[`spark${i}`] = Charts.lineChart($(`#spark-${i}`), [{ label: pid, color: ENV_COLORS[i % ENV_COLORS.length] }], { spark: true });
     });
-
-    if (!editing) renderAssetPicture();
-    loadHistory(true);
   }
 
   // ------------------------------------------------------------- charts
@@ -146,13 +170,12 @@ window.PAGE_POLLS = true; // tells controls.js this page fetches the state itsel
       const [xs, w] = Charts.align(hist, [asset.power]);
       charts.power.setData([xs, w]);
       const e = Charts.cumulativeWh(xs, w);
-      charts.energy.setData([xs, e]);
       lastEnergyWh = e.length ? e[e.length - 1] : null;
     }
     charts.temps.setData(Charts.align(hist, asset.probes.map(p => p.point)));
-    asset.ambient.forEach((pid, i) => charts[`spark${i}`]?.setData(Charts.align(hist, [pid])));
+    envPoints().forEach((pid, i) => charts[`spark${i}`]?.setData(Charts.align(hist, [pid])));
 
-    // heating rate of the first probe (the main one, e.g. Water)
+    // heating rate of the first probe (the main one)
     const main = asset.probes[0];
     const h = main && hist[main.point];
     const rate = h ? Charts.ratePerMin(h.t, h.v) : null;
@@ -174,8 +197,6 @@ window.PAGE_POLLS = true; // tells controls.js this page fetches the state itsel
   function renderLive() {
     if (!state) return;
     const rec = state.recording || {};
-
-    // power & energy
     if (asset) {
       const pw = points[asset.power], st = points[asset.state];
       $("#power-now").innerHTML = pw ? fmt(pw.value, pw.unit) : "—";
@@ -189,7 +210,7 @@ window.PAGE_POLLS = true; // tells controls.js this page fetches the state itsel
       }
       panelStatus("power", [asset.power, asset.state]);
       panelStatus("probes", asset.probes.map(p => p.point));
-      panelStatus("ambient", asset.ambient);
+      panelStatus("ambient", envPoints());
 
       for (const el of document.querySelectorAll("[data-lg]")) {
         const p = points[el.dataset.lg];
@@ -203,10 +224,7 @@ window.PAGE_POLLS = true; // tells controls.js this page fetches the state itsel
         const p = points[el.dataset.elabel];
         if (p) el.textContent = p.label;
       }
-      for (const el of document.querySelectorAll("#dots [data-dot]")) {
-        const p = points[el.dataset.dot];
-        el.querySelector(".pd-val").textContent = p ? fmt(p.value, p.unit, false) : "no reading";
-      }
+      if (dragIndex === null) renderOverlay();
     }
     renderCamera();
   }
@@ -254,67 +272,72 @@ window.PAGE_POLLS = true; // tells controls.js this page fetches the state itsel
   $("#cam-select").onchange = (e) => { store.set("dt.cam", e.target.value); setCamera(e.target.value); };
   $("#cam-full").onclick = () => { const el = $("#thermal-box"); (el.requestFullscreen || el.webkitRequestFullscreen)?.call(el); };
 
-  // ------------------------------------------------ asset picture + probe dots
-  function renderAssetPicture() {
-    const pic = $("#asset-img");
-    if (asset && asset.image) {
-      pic.src = `/api/assets/${encodeURIComponent(asset.id)}/image?v=${Date.now()}`;
-      pic.hidden = false;
-      $("#asset-placeholder").style.display = "none";
-    } else {
-      pic.hidden = true;
-      $("#asset-placeholder").style.display = "";
-    }
-    $("#dots").innerHTML = (asset ? asset.probes : []).map((p, i) => `
-      <div class="pdot ${p.x > 62 ? "flip" : ""}" data-dot="${esc(p.point)}" data-i="${i}"
-           style="left:${p.x}%;top:${p.y}%;--c:${probeColor(i)}">
-        <span class="pd-circle"></span>
-        <span class="pd-label"><b>${esc(p.label)}</b><span class="pd-val">—</span></span>
-      </div>`).join("");
+  // ------------------------------------------------ asset drawing + probe dots
+  const svg = $("#diagram");
+
+  function renderDrawing() {
+    const url = asset && asset.image ? `/api/assets/${encodeURIComponent(asset.id)}/image?v=${Date.now()}` : null;
+    Diagram.drawing($("#dg-drawing"), asset ? asset.drawing : "generic", url);
+    renderOverlay();
   }
 
-  // drag a dot: positions are % of the picture box, so they survive any screen size
-  $("#dots").addEventListener("pointerdown", (e) => {
-    const dot = e.target.closest(".pdot");
-    if (!editing || !dot) return;
+  function renderOverlay() {
+    if (!asset) return;
+    const probes = draft || asset.probes;
+    Diagram.overlay($("#dg-overlay"), probes.map((p, i) => {
+      const live = points[p.point];
+      return {
+        i, label: p.label, x: p.x, y: p.y, color: probeColor(i),
+        value: live ? fmt(live.value, live.unit, false) : "no reading",
+      };
+    }), !!draft);
+  }
+
+  // drag a dot while "Move probes" is on (the pointer is captured by the whole drawing,
+  // so re-drawing the dots on every move doesn't drop the drag)
+  svg.addEventListener("pointerdown", (e) => {
+    const g = e.target.closest(".probe");
+    if (!draft || !g) return;
     e.preventDefault();
-    dot.setPointerCapture(e.pointerId);
-    const box = $("#asset-pic").getBoundingClientRect();
-    const move = (ev) => {
-      const x = Math.min(Math.max(((ev.clientX - box.left) / box.width) * 100, 0), 100);
-      const y = Math.min(Math.max(((ev.clientY - box.top) / box.height) * 100, 0), 100);
-      dot.style.left = `${x}%`;
-      dot.style.top = `${y}%`;
-      dot.classList.toggle("flip", x > 62);
-    };
-    const up = () => { dot.removeEventListener("pointermove", move); dot.removeEventListener("pointerup", up); };
-    dot.addEventListener("pointermove", move);
-    dot.addEventListener("pointerup", up);
+    dragIndex = Number(g.dataset.i);
+    svg.setPointerCapture(e.pointerId);
   });
+  svg.addEventListener("pointermove", (e) => {
+    if (dragIndex === null) return;
+    Object.assign(draft[dragIndex], Diagram.toPct(svg, e.clientX, e.clientY));
+    renderOverlay();
+  });
+  const endDrag = () => { dragIndex = null; };
+  svg.addEventListener("pointerup", endDrag);
+  svg.addEventListener("pointercancel", endDrag);
 
   function setEditing(on) {
-    editing = on;
-    $("#asset-pic").classList.toggle("editing", on);
+    draft = on ? asset.probes.map(p => ({ ...p })) : null;
+    svg.classList.toggle("editing", on);
     $("#move-btn").hidden = on;
     $("#move-save").hidden = !on;
     $("#move-cancel").hidden = !on;
+    renderOverlay();
   }
   $("#move-btn").onclick = () => {
     if (!asset || !asset.probes.length) return toast("Add probes first with Probes…", true);
     if (state.recording && state.recording.recording) return toast("Can't move probes during a recording", true);
     setEditing(true);
   };
-  $("#move-cancel").onclick = () => { setEditing(false); renderAssetPicture(); };
+  $("#move-cancel").onclick = () => setEditing(false);
   $("#move-save").onclick = async () => {
-    const probes = asset.probes.map(p => {
-      const dot = document.querySelector(`#dots [data-dot="${CSS.escape(p.point)}"]`);
-      return { ...p, x: parseFloat(dot.style.left), y: parseFloat(dot.style.top) };
-    });
+    const probes = draft.map(p => ({ ...p, x: Math.round(p.x * 10) / 10, y: Math.round(p.y * 10) / 10 }));
     try {
       await api("PUT", `/api/assets/${encodeURIComponent(asset.id)}`, { ...asset, probes });
       setEditing(false);
       toast("Probe positions saved");
     } catch (err) { toast(err.message, true); }
+  };
+
+  $("#drawing-select").onchange = async (e) => {
+    try {
+      await api("PUT", `/api/assets/${encodeURIComponent(asset.id)}`, { ...asset, drawing: e.target.value });
+    } catch (err) { toast(err.message, true); e.target.value = asset.drawing; }
   };
 
   $("#img-btn").onclick = () => $("#img-input").click();
@@ -328,8 +351,7 @@ window.PAGE_POLLS = true; // tells controls.js this page fetches the state itsel
       const res = await fetch(`/api/assets/${encodeURIComponent(asset.id)}/image`, { method: "POST", body: form });
       const json = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(json.error || "upload failed");
-      assetSig = ""; // force a re-draw with the new picture
-      toast("Picture uploaded. Use Move probes to place the dots.");
+      toast("Photo uploaded. Use Move probes to place the dots; switch back to the drawing any time.");
     } catch (err) { toast(err.message, true); }
   };
 
@@ -337,7 +359,7 @@ window.PAGE_POLLS = true; // tells controls.js this page fetches the state itsel
   function detailsConfig(kind) {
     if (kind === "power") return { title: "Power & energy", keys: asset.power ? [asset.power] : [], colors: ["#58a6ff"] };
     if (kind === "response") return { title: "Thermal response", keys: asset.probes.map(p => p.point), colors: asset.probes.map((_, i) => probeColor(i)) };
-    return { title: "Environment", keys: asset.ambient, colors: ["#58a6ff", "#3fb950", "#e3b341", "#a371f7"] };
+    return { title: "Environment", keys: envPoints(), colors: ENV_COLORS };
   }
   const labelOf = (pid) => (asset.probes.find(p => p.point === pid) || {}).label || (points[pid] || {}).label || pid;
   const unitOf = (pid) => (points[pid] || {}).unit;

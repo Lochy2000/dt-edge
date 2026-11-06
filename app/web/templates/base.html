@@ -27,17 +27,12 @@
       {% block head_tools %}{% endblock %}
       <select id="asset-select" title="Object under test"></select>
       <button class="btn ghost" id="probes-btn" type="button">Probes…</button>
+      <button class="btn rec" id="rec-btn" type="button"><span class="rec-dot"></span> <span id="rec-btn-text">Record</span></button>
       <a class="live-chip" id="live-chip" href="/sensors" title="Sensor status">…</a>
       <div class="clock" id="clock">--:--:--</div>
     </div>
   </header>
 
-  {% block controlbar %}
-  <!-- Recording: see controls.js -->
-  <section class="controlbar">
-    <div class="ctl-group rec-area" id="rec-area"></div>
-  </section>
-  {% endblock %}
 
   <div class="banner" id="banner" hidden>Lost connection to the Pi. Retrying…</div>
   <div class="toast" id="toast" hidden></div>
@@ -49,7 +44,8 @@
     <form method="dialog" class="dlg">
       <h2>Probes on <span id="probes-asset"></span></h2>
       <p class="dlg-sub">Tick the temperature probes placed on this object and name them. Names appear on the cards and in recordings.
-        A channel only lists here once it's in <code>sensors.yaml</code>. Drag the dots on the Overview picture to place them.</p>
+        Drag the dots on the Overview drawing to place them.</p>
+      <p class="dlg-note" id="probes-cj" hidden></p>
       <table class="probe-table">
         <thead><tr><th>Use</th><th>Channel</th><th>Name</th><th>Now</th></tr></thead>
         <tbody id="probes-body"></tbody>
@@ -59,6 +55,35 @@
         <button class="btn primary" id="probes-save" value="save">Save</button>
       </div>
     </form>
+  </dialog>
+
+  <!-- Recording: start a run, or (while recording) add markers / stop. See controls.js -->
+  <dialog id="rec-dialog">
+    <div class="dlg">
+      <div id="rec-start-view">
+        <h2>Start a recording</h2>
+        <p class="dlg-sub">Saves every reading on the Pi until you stop it, for asset <b id="rec-asset"></b>
+          (its probe names and positions are saved with the run). Download it afterwards from Recorded runs.</p>
+        <label class="field"><span>Run name</span><input id="run-name" placeholder="e.g. Full kettle: heat-up + cool-down" maxlength="80"></label>
+        <label class="field"><span>Notes <span class="dim">(optional)</span></span><textarea id="run-notes" rows="3" maxlength="2000" placeholder="Water volume, lid open/closed, probe changes..."></textarea></label>
+        <label class="check"><input type="checkbox" id="run-frames" checked> Save thermal images (1 per second)</label>
+        <div class="dlg-actions">
+          <button class="btn ghost" type="button" data-close>Cancel</button>
+          <button class="btn rec" id="rec-start" type="button"><span class="rec-dot"></span> Start recording</button>
+        </div>
+      </div>
+      <div id="rec-live-view" hidden>
+        <h2><span class="rec-live"><span class="rec-dot"></span> REC</span> <span id="rec-name"></span></h2>
+        <p class="rec-stats" id="rec-stats"></p>
+        <label class="field"><span>Add a marker <span class="dim">(Enter)</span></span>
+          <span class="field-row"><input id="marker-text" placeholder="e.g. kettle switched off" maxlength="200">
+          <button class="btn ghost" id="marker-btn" type="button">Add</button></span></label>
+        <div class="dlg-actions">
+          <button class="btn ghost" type="button" data-close>Close</button>
+          <button class="btn stop" id="rec-stop" type="button">■ Stop recording</button>
+        </div>
+      </div>
+    </div>
   </dialog>
 
   {% block scripts %}{% endblock %}

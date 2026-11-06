@@ -9,11 +9,11 @@
 {% endblock %}
 
 {% block content %}
-<!-- Built by overview.js. Each panel reads the ACTIVE ASSET to know which sensors it shows,
-     so the same page works for a kettle, a toaster, ... -->
+<!-- Built by overview.js. Each panel reads the ACTIVE ASSET to know which sensors it shows.
+     On a laptop-sized screen or bigger, all four panels fit on one screen (see style.css). -->
 <main class="ov-grid">
 
-  <!-- Power & energy: from the asset's "power" and "state" points (the smart plug) -->
+  <!-- Power & energy: the asset's "power" and "state" points (the smart plug) -->
   <section class="panel" id="p-power">
     <div class="panel-head">
       <h2>Power &amp; energy</h2><span class="pstat" data-for="power"></span>
@@ -24,10 +24,7 @@
       <div class="tile"><span class="t-label" id="energy-label">Energy</span><b class="t-value" id="energy-now">—</b></div>
       <div class="tile"><span class="t-label">Plug</span><b class="t-value" id="state-now">—</b></div>
     </div>
-    <div class="chart-title">Electrical power <small>W</small></div>
-    <div class="chart" id="ch-power"></div>
-    <div class="chart-title">Energy, cumulative over the time shown <small>Wh</small></div>
-    <div class="chart short" id="ch-energy"></div>
+    <div class="chart fill" id="ch-power"></div>
   </section>
 
   <!-- Thermal camera: one camera at a time, chosen in the dropdown -->
@@ -41,54 +38,54 @@
       <div class="frame"><img id="cam-img" alt="thermal image"><div class="frame-msg" id="cam-msg" hidden></div></div>
       <div class="scale"><span class="hi" id="cam-hi">--</span><div class="bar"></div><span class="lo" id="cam-lo">--</span></div>
     </div>
-    <div class="tiles three">
+    <div class="tiles three compact">
       <div class="tile"><span class="t-label">Min</span><b class="t-value" id="cam-min">—</b></div>
       <div class="tile"><span class="t-label">Mean</span><b class="t-value" id="cam-mean">—</b></div>
       <div class="tile"><span class="t-label">Max</span><b class="t-value" id="cam-max">—</b></div>
     </div>
   </section>
 
-  <!-- Thermal response: every probe on the asset over time -->
+  <!-- Thermal response: every probe on the asset over time, next to the drawing showing where each one sits -->
   <section class="panel" id="p-response">
     <div class="panel-head">
       <h2>Thermal response</h2><span class="pstat" data-for="probes"></span>
+      <span class="head-metric" title="Slope of the last 60 s of the first probe"><span id="rate-label">Heating rate</span> <b id="rate-now">—</b></span>
       <button class="link" data-details="response" type="button">Open details ↗</button>
     </div>
-    <div class="legend" id="temps-legend"></div>
-    <div class="chart tall" id="ch-temps"></div>
-    <div class="tile wide-tile">
-      <span class="t-label" id="rate-label">Heating rate</span><b class="t-value" id="rate-now">—</b>
-      <span class="t-hint">slope of the last 60 s</span>
-    </div>
-  </section>
-
-  <!-- Environment & asset: room conditions + where the probes sit on the object -->
-  <section class="panel" id="p-env">
-    <div class="panel-head">
-      <h2>Environment &amp; asset</h2><span class="pstat" data-for="ambient"></span>
-      <button class="link" data-details="env" type="button">Open details ↗</button>
-    </div>
-    <div class="env">
-      <div class="env-tiles" id="env-tiles"></div>
+    <div class="response">
+      <div class="response-chart">
+        <div class="legend" id="temps-legend"></div>
+        <div class="chart fill" id="ch-temps"></div>
+      </div>
       <div class="asset-side">
-        <div class="asset-pic" id="asset-pic">
-          <img id="asset-img" alt="" hidden>
-          <svg id="asset-placeholder" viewBox="0 0 400 300" aria-hidden="true">
-            <rect x="120" y="50" width="160" height="200" rx="18" fill="none" stroke="currentColor" stroke-width="2"/>
-            <line x1="120" y1="90" x2="280" y2="90" stroke="currentColor" stroke-width="1.5" stroke-dasharray="4 4"/>
-            <text x="200" y="285" text-anchor="middle" fill="currentColor" font-size="13">Upload a photo of the setup to place the probes</text>
-          </svg>
-          <div id="dots"></div>
-        </div>
+        <!-- 2D drawing (kettle / generic / uploaded photo) with probe dots and labels: drawn in diagram.js -->
+        <svg class="diagram" id="diagram" viewBox="0 0 560 340" preserveAspectRatio="xMidYMid meet">
+          <g id="dg-drawing"></g>
+          <g id="dg-overlay"></g>
+        </svg>
         <div class="asset-tools">
+          <select id="drawing-select" title="Picture the probes sit on">
+            <option value="kettle">Kettle drawing</option>
+            <option value="generic">Generic outline</option>
+            <option value="photo">Uploaded photo</option>
+          </select>
           <button class="btn ghost" id="move-btn" type="button">Move probes</button>
           <button class="btn primary" id="move-save" type="button" hidden>Save positions</button>
           <button class="btn ghost" id="move-cancel" type="button" hidden>Cancel</button>
-          <button class="btn ghost" id="img-btn" type="button">Upload picture</button>
+          <button class="btn ghost" id="img-btn" type="button" title="Use a photo of the setup instead of a drawing">Upload photo</button>
           <input type="file" id="img-input" accept="image/png,image/jpeg,image/webp" hidden>
         </div>
       </div>
     </div>
+  </section>
+
+  <!-- Environment: every room-air reading, with a trend line each -->
+  <section class="panel" id="p-env">
+    <div class="panel-head">
+      <h2>Environment</h2><span class="pstat" data-for="ambient"></span>
+      <button class="link" data-details="env" type="button">Open details ↗</button>
+    </div>
+    <div class="env-tiles" id="env-tiles"></div>
   </section>
 </main>
 
@@ -113,5 +110,6 @@
 {% block scripts %}
   <script src="{{ url_for('static', filename='vendor/uPlot.iife.min.js') }}"></script>
   <script src="{{ url_for('static', filename='charts.js') }}"></script>
+  <script src="{{ url_for('static', filename='diagram.js') }}"></script>
   <script src="{{ url_for('static', filename='overview.js') }}"></script>
 {% endblock %}

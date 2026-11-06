@@ -130,13 +130,13 @@ Each sensor runs in its own thread. If a read fails 3 times in a row, that senso
 
 | Page | What it's for |
 |---|---|
-| **Overview** | The rig at a glance, for the object under test: power & energy, one thermal camera, probe temperatures over time with heating rate, room air, and a picture of the object with live probe dots. Each panel has **Open details** (big graph, min/max/mean, CSV of the time shown) |
+| **Overview** | The rig at a glance on one screen, for the object under test: power & energy, one thermal camera, probe temperatures over time with heating rate next to a 2D drawing of the object (kettle / generic / your photo) showing each probe's live reading, and all room-air readings. Each panel has **Open details** (big graph, min/max/mean, CSV of the time shown) |
 | **Sensors** | Every sensor as a card with its status: the health check when setting up or debugging |
 | **Recorded runs** | Downloads for every recorded test |
 
-The header shows the asset (object under test), **Probes…**, a **Live** indicator (amber/red with a count when a sensor needs a look; click it for the Sensors page) and, on Overview, the time range for the graphs (5–60 min, kept in memory on the Pi).
+The header shows the asset (object under test), **Probes…**, **Record**, a **Live** indicator (amber/red with a count when a sensor needs a look; click it for the Sensors page) and, on Overview, the time range for the graphs (5–60 min, kept in memory on the Pi).
 
-**Placing probes on the picture:** Overview → **Upload picture** (a photo of the setup works best) → **Move probes** → drag each dot to where the thermocouple is → **Save positions**. Dots use the same colours as the graph lines.
+**Placing probes on the drawing:** Overview → **Move probes** → drag each dot to where the thermocouple is → **Save positions**. Labels arrange themselves either side of the object; dots, lines and labels use the same colours as the graph lines. Pick **Kettle drawing**, **Generic outline** or **Uploaded photo** (after **Upload photo**) under the drawing.
 
 **No hardware / demo fallback:** `./run.sh --config demo.yaml` runs simulated sensors with the same names as the rig (thermocouples, plug switching ~2.9 kW, room air, camera), so the whole dashboard works with nothing plugged in.
 
@@ -145,9 +145,9 @@ The graphs use [uPlot](https://github.com/leeoniya/uPlot) (MIT), stored in `app/
 ## Recording a test run
 
 1. Pick the **Asset** (the object under test) in the header. Use **Probes…** to tick which thermocouples are on it and name them (Water, Lid, ...).
-2. Type a run name (and notes), leave **save thermal images** ticked if you want them, and press **Start recording**.
-3. While it runs, type a **marker** and press Enter for anything worth noting ("kettle switched off", "lid opened"). Plug on/off changes are logged automatically.
-4. Press **Stop**. Then open **Recorded runs** to download it.
+2. Press **Record** in the header, type a run name (and notes), leave **Save thermal images** ticked if you want them, and press **Start recording**. The button turns into a red running timer.
+3. While it runs, click the timer to add a **marker** for anything worth noting ("kettle switched off", "lid opened"). Plug on/off changes are logged automatically.
+4. Click the timer → **Stop recording**. Then open **Recorded runs** to download it.
 
 | Download | What it is |
 |---|---|
@@ -163,7 +163,9 @@ Runs are saved on the Pi in `data/runs/<date-time>_<name>/`. Energy per run is w
 `sensors.yaml` says what **hardware** is plugged in. An **asset profile** says what it **means** for the object under test. So moving the probes from the kettle to a toaster needs no config or code change:
 
 - **New object:** Asset dropdown → **+ New asset…** (starts as a copy of the current one) → **Probes…** to tick and name its probes.
-- **Adding a thermocouple:** plug it into a free TC-08 socket, add the socket number to `channels:` in `sensors.yaml`, restart. It then appears in **Probes…** as `tc08.chN`.
+- **Thermocouples:** all 8 TC-08 sockets are read (`tc08.ch1` … `tc08.ch8`), plus `tc08.cold_junction`, the logger's own temperature. Tick the sockets you're using in **Probes…** and name them; unticked ones are dimmed on the Sensors page and left off the Overview.
+- **The TC-08 cannot detect an unplugged probe.** An empty socket reads about the logger's own (cold junction) temperature, so it looks like a probe at room temperature. **Probes…** shows the logger temperature and marks sockets reading within 0.3 °C of it ("≈ logger"). If unsure which probe is in which socket, hold one tip in your fingers and watch which value rises.
+- **Probe tips must not touch the water or other conductive parts of a powered appliance.** On this rig a probe in the kettle water caused jumps on all channels (the TC-08 is pushed out of its input range by the voltage difference), and it's an electrical safety risk. Use insulated (ungrounded-junction) probes if a reading in the water is needed.
 - Profiles are kept in `data/assets/*.json`. `data/` isn't in Git, so dashboard edits never clash with `git pull`. The example in `assets_default/` is copied in on first start.
 - Each probe also has a position on a picture of the object (x, y in %), set by dragging the dots on the Overview.
 

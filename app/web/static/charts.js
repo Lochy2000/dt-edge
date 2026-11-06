@@ -33,7 +33,7 @@ const Charts = (() => {
     return splits.map(t => new Date(t * 1000).toLocaleTimeString("en-GB", o));
   }
 
-  // series: [{label, color, unit, dp, fill}]   opts: {height, spark, legend, zero}
+  // series: [{label, color, unit, dp, fill}]   opts: {height (default: fill the box), spark, legend, zero}
   //   zero: y axis always starts at 0 (power, energy), so noise isn't magnified into spikes
   function lineChart(el, series, opts = {}) {
     const spark = !!opts.spark;
@@ -43,15 +43,19 @@ const Charts = (() => {
       ticks: { stroke: C("--line"), width: 1 },
       font: "11px " + C("--sans"),
     };
+    // No fixed height = fill the box (the overview's panels share out the screen height).
+    const size = () => ({ width: Math.max(el.clientWidth, 100), height: opts.height || Math.max(el.clientHeight, spark ? 20 : 80) });
     const u = new uPlot({
-      width: Math.max(el.clientWidth, 100),
-      height: opts.height || 160,
-      padding: spark ? [4, 0, 4, 0] : [10, 12, 0, 0],
+      ...size(),
+      padding: spark ? [6, 2, 6, 2] : [10, 12, 0, 0],
       legend: { show: !!opts.legend, live: true },
       cursor: spark ? { show: false } : { drag: { x: false, y: false }, points: { size: 6 } },
       scales: {
         x: { time: true },
-        y: opts.zero ? { range: (u, lo, hi) => [0, hi > 0 ? hi * 1.1 : 1] } : {},
+        y: opts.zero ? { range: (u, lo, hi) => [0, hi > 0 ? hi * 1.1 : 1] }
+          // sparklines: headroom above and below, so a flat line isn't drawn on (and clipped by) the edge
+          : spark ? { range: (u, lo, hi) => { const pad = Math.max((hi - lo) * 0.25, 0.1); return [lo - pad, hi + pad]; } }
+          : {},
       },
       axes: spark ? [{ show: false }, { show: false }] : [
         { ...axis, values: timeLabels },
@@ -71,8 +75,8 @@ const Charts = (() => {
       ],
     }, [[], ...series.map(() => [])], el);
 
-    // keep the chart as wide as its box
-    new ResizeObserver(() => u.setSize({ width: Math.max(el.clientWidth, 100), height: u.height })).observe(el);
+    // keep the chart the size of its box
+    new ResizeObserver(() => u.setSize(size())).observe(el);
     return u;
   }
 

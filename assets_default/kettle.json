@@ -4,13 +4,13 @@
   "power": "plug.power",
   "state": "plug.on",
   "thermal": "lepton.image",
-  "ambient": ["ambient.air_temp", "ambient.humidity"],
+  "ambient": ["ambient.air_temp", "ambient.humidity", "ambient.pressure"],
   "image": null,
-  "notes": "Example profile. Edit labels and probe positions on the dashboard.",
+  "drawing": "kettle",
+  "notes": "Example profile. Tick and name the probes in Probes..., then drag the dots to where they sit.",
   "probes": [
-    {"point": "tc08.ch1", "label": "Water", "x": 50, "y": 60},
-    {"point": "tc08.ch2", "label": "Surface 1", "x": 75, "y": 45},
-    {"point": "tc08.ch3", "label": "Surface 2", "x": 75, "y": 70},
-    {"point": "tc08.ch4", "label": "Base", "x": 50, "y": 92}
+    {"point": "tc08.ch1", "label": "Surface top", "x": 40, "y": 38},
+    {"point": "tc08.ch2", "label": "Surface middle", "x": 60, "y": 58},
+    {"point": "tc08.ch3", "label": "Surface bottom", "x": 40, "y": 78}
   ]
 }

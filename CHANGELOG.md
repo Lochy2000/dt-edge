@@ -1,5 +1,17 @@
 # Changelog
 
+## 2026-11-06 — Kettle drawing next to the probe graph
+- The asset drawing moved into **Thermal response**, beside the probe graph, so each line sits next to its dot. Layout: Power | Thermal camera on top; Thermal response (graph + drawing) | Environment (narrow column) below.
+- Environment trend lines fill their tiles; fixed them being clipped at the bottom.
+
+## 2026-11-06 — Dashboard cleanup
+- **Overview fits on one screen** (laptop size and up): smaller tiles, charts fill their panels, the cumulative energy graph removed (energy stays as a number and in Open details), heating rate moved into the panel header. Smaller screens still scroll.
+- **Record button in the header** (all pages) replaces the recording bar: opens a start dialog; while recording it shows a red timer and opens markers / stop.
+- **2D kettle drawing** (`diagram.js`): built-in kettle and generic drawings, or an uploaded photo (`drawing` in the asset; existing kettle profiles are switched to the kettle drawing automatically). Labels laid out in columns either side, linked to dots by lines, bigger text; drag dots in Move probes.
+- **Thermal image** no longer cropped; it shrinks to fit the panel.
+- **Environment panel shows every room-air reading** (pressure is back).
+- **All 8 TC-08 sockets** in `sensors.yaml`, plus the logger's internal (cold junction) temperature. The TC-08 can't detect unplugged probes: Probes… shows the logger temperature and flags sockets reading ≈ it; unticked sockets are dimmed on the Sensors page.
+
 ## 2026-11-06 — Step 2: new Overview layout
 - **Overview page** (`overview.html`, `overview.js`, `charts.js`): four panels as in the mockup, all driven by the active asset: Power & energy (live W, energy this run / over the time shown, power and cumulative energy graphs), Thermal camera (one at a time, dropdown, full screen), Thermal response (all probes over time, heating/cooling rate of the main probe), Environment & asset (room air with sparklines, picture of the object with live, draggable probe dots). **Open details** per panel: big graph, min/max/mean, CSV of the time shown.
 - **Pages**: Overview (`/`), Sensors (`/sensors`, the old cards view), Recorded runs. Shared header/recording bar/probe editor in `base.html`; header shows a Live / "n need a look" indicator.

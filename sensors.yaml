@@ -30,13 +30,21 @@ sensors:
   - id: tc08
     type: tc08
     label: Thermocouples · TC-08
-    poll_s: 1             # each channel takes ~0.1 s to read, so 1 s suits up to ~8 channels
+    poll_s: 1             # each channel takes ~0.1 s, so all 8 + the internal sensor take ~0.9 s
     mains_hz: 50          # UK mains
-    channels:             # sockets with a probe plugged in -> probe type (printed on the plug, usually K)
-      1: K                # readings appear as tc08.ch1, tc08.ch2, ...
-      2: K                # labels (Water, Surface...) and positions are set per asset on the dashboard
+    show_cold_junction: true   # tc08.cold_junction = the logger's own temperature
+    # All 8 sockets are read. NOTE: the TC-08 can't tell if a probe is unplugged - an empty
+    # socket reads about the same as the logger's own (cold junction) temperature. Which
+    # sockets are in use, and their names, are set per asset in Probes... on the dashboard.
+    channels:             # socket -> probe type (printed on the plug, usually K)
+      1: K                # readings appear as tc08.ch1 ... tc08.ch8
+      2: K
       3: K
       4: K
+      5: K
+      6: K
+      7: K
+      8: K
 
   - id: ambient
     type: bme280

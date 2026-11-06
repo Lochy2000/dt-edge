@@ -15,7 +15,7 @@ sensors:
   - id: tc08
     type: simulated
     label: Simulated thermocouples
-    channels: 4           # tc08.ch1 ... tc08.ch4
+    channels: 8           # tc08.ch1 ... tc08.ch8
     poll_s: 1
 
   - id: plug

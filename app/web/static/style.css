@@ -254,3 +254,110 @@ code { font-family: var(--mono); font-size: 12px; background: var(--panel-2); pa
 .stats-table td { padding: 6px 8px; border-bottom: 1px solid var(--line); font-family: var(--mono); }
 .stats-table td:first-child { font-family: var(--sans); }
 .sw { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 8px; vertical-align: middle; }
+
+/* =====================================================================
+   Cleanup round: header Record button, one-screen overview, kettle drawing
+   ===================================================================== */
+
+/* header Record button: "Record" when idle, red running timer while recording */
+.btn.rec.on { background: var(--error); border-color: var(--error); color: #fff; font-family: var(--mono); }
+.btn.rec.on .rec-dot { background: #fff; animation: blink 1.2s infinite; }
+
+/* dialog form fields */
+.field { display: flex; flex-direction: column; gap: 5px; font-size: 13px; color: var(--dim); margin-bottom: 12px; }
+.field input, .field textarea { width: 100%; color: var(--text); }
+.field-row { display: flex; gap: 8px; }
+textarea { background: var(--bg); color: var(--text); border: 1px solid var(--line); border-radius: 8px; padding: 7px 10px; font: 13px var(--sans); resize: vertical; }
+#rec-dialog { max-width: 520px; }
+.rec-stats { font: 14px var(--mono); color: var(--dim); margin: 4px 0 16px; }
+.dlg-note { margin: -6px 0 12px; padding: 8px 10px; border-radius: 8px; background: var(--panel-2); color: var(--dim); font-size: 12.5px; line-height: 1.45; }
+.dlg-note b { color: var(--text); }
+
+/* Sensors page: thermocouple sockets not ticked in Probes... */
+.metric.unused { opacity: 0.45; }
+
+/* ---------- overview panels, compact ---------- */
+.panel { padding: 14px 16px; gap: 10px; }
+.panel-head h2 { font-size: 18px; }
+.panel-head .head-metric { margin-left: auto; font-size: 13px; color: var(--dim); white-space: nowrap; }
+.panel-head .head-metric b { color: var(--text); font: 600 15px var(--mono); margin-left: 4px; }
+.panel-head .head-metric small { font: 12px var(--sans); color: var(--dim); margin-left: 3px; }
+.panel-head .head-metric + .link { margin-left: 14px; }
+.tile { padding: 8px 12px; }
+.t-value { font-size: 22px; margin-top: 2px; }
+.tiles.compact .t-value { font-size: 19px; }
+.chart.fill { height: 240px; }           /* scrolling layout (small screens) */
+.thermal .frame { aspect-ratio: 4 / 3; }
+
+/* environment: room-air tiles + drawing */
+.env { display: grid; grid-template-columns: minmax(150px, 0.55fr) 1.45fr; gap: 12px; align-items: stretch; }
+.env-tiles { display: flex; flex-direction: column; gap: 8px; overflow-y: auto; }
+.env-tile { padding: 6px 10px; }
+.env-tile .t-value { font-size: 18px; }
+.env-tile .spark { margin-top: 2px; height: 30px; }
+.asset-side { display: flex; flex-direction: column; gap: 8px; min-width: 0; min-height: 0; }
+.asset-tools { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+.asset-tools .btn, .asset-tools select { padding: 5px 10px; font-size: 12.5px; }
+
+.diagram { width: 100%; aspect-ratio: 560 / 340; background: var(--bg); border: 1px solid var(--line); border-radius: 10px; touch-action: none; user-select: none; display: block; }
+.diagram .dg-line { fill: none; stroke: #9aa5b4; stroke-width: 2.5; stroke-linejoin: round; stroke-linecap: round; }
+.diagram .dg-level { stroke-dasharray: 6 6; stroke-width: 1.5; stroke: #58a6ff; }
+.diagram .dg-water { fill: rgba(88, 166, 255, 0.10); }
+.diagram .dg-caption { fill: var(--dim); font: 11px var(--sans); }
+.diagram .leader { fill: none; stroke-width: 1.6; opacity: 0.9; }
+.diagram .lbox { fill: rgba(22, 27, 34, 0.94); stroke: var(--line); }
+.diagram .lname { fill: var(--dim); font-family: var(--sans); font-weight: 600; }
+.diagram .lval { fill: var(--text); font-family: var(--mono); font-weight: 700; }
+.diagram .dot { stroke: #fff; stroke-width: 2.5; }
+.diagram .hit { fill: transparent; }
+.diagram.editing { outline: 2px dashed #1f6feb; outline-offset: -2px; }
+.diagram.editing .probe { cursor: grab; }
+.diagram.editing .probe:active { cursor: grabbing; }
+
+/* ---------- one screen: all four panels without scrolling (laptop-size and up) ---------- */
+@media (min-width: 1100px) and (min-height: 640px) {
+  body.page-overview { height: 100vh; overflow: hidden; display: flex; flex-direction: column; }
+  .page-overview .ov-grid { flex: 1; min-height: 0; grid-template-rows: minmax(0, 1fr) minmax(0, 1fr); gap: 14px; padding: 14px 18px; }
+  .page-overview .panel { min-height: 0; overflow: hidden; }
+  .page-overview .chart.fill { flex: 1; min-height: 0; height: auto; overflow: hidden; }
+  .page-overview .thermal { flex: 1; min-height: 0; }
+  .page-overview .thermal .frame { aspect-ratio: auto; height: 100%; }
+  .page-overview .env { flex: 1; min-height: 0; }
+  .page-overview .asset-side { justify-content: center; }
+  .page-overview .diagram { flex: 1; min-height: 0; width: 100%; height: auto; aspect-ratio: auto; }
+}
+
+/* fixes: thermal image must shrink to its box (not be cropped); tighter room-air tiles */
+.thermal .frame { position: relative; display: block; }
+.thermal .frame img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; }
+.env { grid-template-columns: minmax(140px, 0.5fr) 1.5fr; }
+.env-tile { padding: 5px 10px; }
+.env-tile .t-label { font-size: 12px; }
+.env-tile .spark { height: 24px; }
+.field > span:first-child { display: block; }
+
+/* ---------- layout v3: kettle drawing inside Thermal response, Environment as a narrow column ----------
+   top row:    Power & energy | Thermal camera
+   bottom row: Thermal response (graph + drawing) | Environment */
+.ov-grid { grid-template-columns: 5fr 3fr 2fr; grid-template-areas: "power cam cam" "resp resp env"; }
+#p-power { grid-area: power; }
+#p-thermal { grid-area: cam; }
+#p-response { grid-area: resp; }
+#p-env { grid-area: env; }
+@media (max-width: 1100px) { .ov-grid { grid-template-columns: 1fr; grid-template-areas: "power" "cam" "resp" "env"; } }
+
+.response { display: grid; grid-template-columns: 1.2fr 1fr; gap: 14px; }
+@media (max-width: 900px) { .response { grid-template-columns: 1fr; } }
+.response-chart { display: flex; flex-direction: column; gap: 8px; min-width: 0; min-height: 0; }
+.env-tiles { overflow-y: auto; }
+.env-tile { display: flex; flex-direction: column; }
+.env-tile .t-value { font-size: 22px; }
+.env-tile .spark { height: 44px; }
+
+@media (min-width: 1100px) and (min-height: 640px) {
+  .page-overview .response { flex: 1; min-height: 0; }
+  .page-overview .response-chart .chart.fill { flex: 1; min-height: 0; }
+  .page-overview .env-tiles { flex: 1; min-height: 0; }
+  .page-overview .env-tile { flex: 1; min-height: 0; }
+  .page-overview .env-tile .spark { flex: 1; min-height: 24px; height: auto; overflow: hidden; }
+}

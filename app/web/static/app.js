@@ -69,6 +69,10 @@ function makeFrameView(container, pointId) {
   return { hi: wrap.querySelector(".hi"), lo: wrap.querySelector(".lo") };
 }
 
+// Thermocouple sockets not ticked in Probes... for the current asset are shown dimmed ("not in use"):
+// the TC-08 still reports a number for an empty socket, so this is the only way to tell them apart.
+let inUse = null; // Set of point ids on the active asset
+
 function updateCard(c, s) {
   c.el.style.setProperty("--c", STATUS_COLOUR[s.status]);
   c.el.classList.toggle("wide", s.frames.length > 0);
@@ -83,11 +87,14 @@ function updateCard(c, s) {
   }
 
   if (s.points.length) {
-    c.metrics.innerHTML = s.points.map(p => `
-      <div class="metric ${p.quality === "BAD" ? "bad" : ""}" title="${esc(p.point_id)}">
-        <span class="m-label">${esc(p.label)}</span>
+    c.metrics.innerHTML = s.points.map(p => {
+      const unused = s.type === "tc08" && inUse && !inUse.has(p.point_id) && !p.point_id.endsWith(".cold_junction");
+      return `
+      <div class="metric ${p.quality === "BAD" ? "bad" : ""} ${unused ? "unused" : ""}" title="${esc(p.point_id)}${unused ? " · not ticked in Probes…" : ""}">
+        <span class="m-label">${esc(p.label)}${unused ? " · not in use" : ""}</span>
         <span class="m-value">${formatValue(p)}</span>
-      </div>`).join("");
+      </div>`;
+    }).join("");
   } else {
     c.metrics.innerHTML = `<div class="no-data">${s.status === "OFF" ? "Disabled in sensors.yaml" : "No data yet"}</div>`;
   }
@@ -114,6 +121,7 @@ async function tick() {
     if (!res.ok) throw new Error(res.status);
     const state = await res.json();
     document.getElementById("banner").hidden = true;
+    inUse = state.asset ? new Set(state.asset.probes.map(p => p.point)) : null;
     for (const s of state.sensors) {
       const c = cards[s.id] || (cards[s.id] = makeCard(s));
       updateCard(c, s);

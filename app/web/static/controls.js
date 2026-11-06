@@ -1,10 +1,9 @@
-// Shared by every page: header (asset picker, live status, clock), recording bar, probe editor.
+// Shared by every page: header (asset picker, Record button, live status, clock), probe editor.
 // Pages that poll /api/state themselves (overview.js, app.js) hand the result to window.onState;
 // on other pages (runs) this file polls it every 2 s.
 
 const $ = (sel) => document.querySelector(sel);
 let lastState = null;
-let wasRecording = null;  // re-draw the recording bar only when this flips, so typing isn't wiped
 
 function escHtml(s) {
   return String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
@@ -64,57 +63,69 @@ $("#asset-select").addEventListener("change", async (e) => {
   await loadAssets();
 });
 
-// ------------------------------------------------------------- recording bar
-function drawRecArea(rec) {
-  const area = $("#rec-area");
-  if (!area) return; // page without a recording bar
-  if (!rec.recording) {
-    area.innerHTML = `
-      <input id="run-name" class="grow" placeholder="Run name, e.g. Full kettle: heat-up + cool-down" maxlength="80">
-      <input id="run-notes" class="grow" placeholder="Notes (optional)" maxlength="2000">
-      <label class="check"><input type="checkbox" id="run-frames" checked> save thermal images</label>
-      <button class="btn rec" id="rec-start" type="button"><span class="rec-dot"></span> Start recording</button>`;
-    $("#rec-start").onclick = async () => {
-      try {
-        await api("POST", "/api/record/start", {
-          name: $("#run-name").value, notes: $("#run-notes").value, frames: $("#run-frames").checked,
-        });
-        toast("Recording started");
-      } catch (err) { toast(err.message, true); }
-    };
-  } else {
-    area.innerHTML = `
-      <span class="rec-live"><span class="rec-dot"></span> REC</span>
-      <b class="rec-name">${escHtml(rec.name)}</b>
-      <span class="rec-stats" id="rec-stats"></span>
-      <input id="marker-text" class="grow" placeholder="Marker, e.g. kettle switched off" maxlength="200">
-      <button class="btn ghost" id="marker-btn" type="button">Add marker</button>
-      <button class="btn stop" id="rec-stop" type="button">■ Stop</button>`;
-    const addMarker = async () => {
-      try {
-        await api("POST", "/api/record/marker", { text: $("#marker-text").value });
-        $("#marker-text").value = "";
-        toast("Marker added");
-      } catch (err) { toast(err.message, true); }
-    };
-    $("#marker-btn").onclick = addMarker;
-    $("#marker-text").onkeydown = (e) => { if (e.key === "Enter") addMarker(); };
-    $("#rec-stop").onclick = async () => {
-      if (!confirm("Stop this recording?")) return;
-      try {
-        const meta = await api("POST", "/api/record/stop");
-        toast(`Saved "${meta.name}": ${meta.rows.toLocaleString()} readings. See Recorded runs.`);
-      } catch (err) { toast(err.message, true); }
-    };
-  }
+// ---------------------------------------------------------------- recording
+// Header button: "Record" when idle; a red running timer while recording. Both open #rec-dialog.
+let recState = { recording: false };
+
+function showRecView() {
+  $("#rec-start-view").hidden = recState.recording;
+  $("#rec-live-view").hidden = !recState.recording;
+  $("#rec-asset").textContent = lastState && lastState.asset ? lastState.asset.name : "—";
+  $("#rec-name").textContent = recState.name || "";
 }
 
-function updateRecStats(rec) {
-  const el = $("#rec-stats");
-  if (!el) return;
-  const energy = rec.energy_wh == null ? "" : ` · ${rec.energy_wh.toFixed(1)} Wh`;
-  const frames = rec.frames ? ` · ${rec.frames} images` : "";
-  el.textContent = `${hms(rec.elapsed_s)} · ${rec.rows.toLocaleString()} readings${energy}${frames}`;
+$("#rec-btn").onclick = () => {
+  showRecView();
+  $("#rec-dialog").showModal();
+  (recState.recording ? $("#marker-text") : $("#run-name")).focus();
+};
+for (const b of document.querySelectorAll("#rec-dialog [data-close]")) b.onclick = () => $("#rec-dialog").close();
+
+$("#rec-start").onclick = async () => {
+  try {
+    await api("POST", "/api/record/start", {
+      name: $("#run-name").value, notes: $("#run-notes").value, frames: $("#run-frames").checked,
+    });
+    $("#run-name").value = "";
+    $("#run-notes").value = "";
+    $("#rec-dialog").close();
+    toast("Recording started");
+  } catch (err) { toast(err.message, true); }
+};
+
+async function addMarker() {
+  try {
+    await api("POST", "/api/record/marker", { text: $("#marker-text").value });
+    $("#marker-text").value = "";
+    toast("Marker added");
+  } catch (err) { toast(err.message, true); }
+}
+$("#marker-btn").onclick = addMarker;
+$("#marker-text").onkeydown = (e) => { if (e.key === "Enter") { e.preventDefault(); addMarker(); } };
+
+$("#rec-stop").onclick = async () => {
+  if (!confirm("Stop this recording?")) return;
+  try {
+    const meta = await api("POST", "/api/record/stop");
+    $("#rec-dialog").close();
+    toast(`Saved "${meta.name}": ${meta.rows.toLocaleString()} readings. See Recorded runs.`);
+  } catch (err) { toast(err.message, true); }
+};
+
+function updateRec(rec) {
+  const flipped = rec.recording !== recState.recording;
+  recState = rec;
+  const btn = $("#rec-btn");
+  btn.classList.toggle("on", !!rec.recording);
+  btn.title = rec.recording ? "Recording: click to add a marker or stop" : "Start a recording";
+  $("#rec-btn-text").textContent = rec.recording ? `REC ${hms(rec.elapsed_s)}` : "Record";
+  if (rec.recording) {
+    const energy = rec.energy_wh == null ? "" : ` · ${rec.energy_wh.toFixed(1)} Wh`;
+    const frames = rec.frames ? ` · ${rec.frames} images` : "";
+    const markers = rec.markers ? ` · ${rec.markers} markers` : "";
+    $("#rec-stats").textContent = `${hms(rec.elapsed_s)} · ${rec.rows.toLocaleString()} readings${energy}${frames}${markers}`;
+  }
+  if (flipped && $("#rec-dialog").open) showRecView();
 }
 
 // ------------------------------------------------------------- probe editor
@@ -125,7 +136,7 @@ function tcPoints(state) {
   return state.sensors
     .filter(s => s.frames.length === 0)
     .flatMap(s => s.points)
-    .filter(p => p.unit === "DEG_C" && !ambient.has(p.point_id));
+    .filter(p => p.unit === "DEG_C" && !ambient.has(p.point_id) && !p.point_id.endsWith(".cold_junction"));
 }
 
 $("#probes-btn").onclick = () => {
@@ -135,10 +146,16 @@ $("#probes-btn").onclick = () => {
   const live = Object.fromEntries(tcPoints(lastState).map(p => [p.point_id, p]));
   const ids = [...new Set([...Object.keys(live), ...Object.keys(onAsset)])].sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
 
+  // The TC-08 can't detect an unplugged probe: an empty socket reads about the logger's own temperature.
+  const cj = lastState.sensors.flatMap(s => s.points).find(p => p.point_id.endsWith(".cold_junction"));
+  $("#probes-cj").hidden = !cj;
+  if (cj) $("#probes-cj").innerHTML = `Logger internal temperature: <b>${Number(cj.value).toFixed(1)} °C</b>. The TC-08 can't detect an unplugged probe:
+    an empty socket reads close to this, so "≈ logger" can mean unplugged (or a probe at room temperature). Use the pinch test if unsure.`;
   $("#probes-asset").textContent = asset.name;
   $("#probes-body").innerHTML = ids.length ? ids.map(id => {
     const p = onAsset[id], l = live[id];
-    const now = !l ? "not reading" : l.value == null ? "—" : `${Number(l.value).toFixed(1)} °C`;
+    let now = !l ? "not reading" : l.value == null ? "—" : `${Number(l.value).toFixed(1)} °C`;
+    if (l && cj && l.value != null && Math.abs(l.value - cj.value) < 0.3) now += " ≈ logger";
     return `<tr data-point="${escHtml(id)}">
       <td><input type="checkbox" class="p-use" ${p ? "checked" : ""}></td>
       <td class="mono">${escHtml(id)}</td>
@@ -183,11 +200,7 @@ window.onState = (state) => {
   updateLiveChip(state);
   $("#asset-name").textContent = state.asset ? state.asset.name : "no asset";
   const rec = state.recording || { recording: false };
-  if (rec.recording !== wasRecording) {
-    drawRecArea(rec);
-    wasRecording = rec.recording;
-  }
-  updateRecStats(rec);
+  updateRec(rec);
   $("#asset-select").disabled = rec.recording;  // the asset is fixed for the length of a run
   $("#probes-btn").disabled = rec.recording;
   if (state.asset && $("#asset-select").dataset.active !== state.asset.id) loadAssets();
