@@ -72,6 +72,8 @@ class Store:
         entry["frame"] = frame
         if s["scale"] == "auto":
             lo, hi = float(frame.data.min()), float(frame.data.max())
+            if not (math.isfinite(lo) and math.isfinite(hi)):
+                return  # second line of defence: a NaN here would stick in the smoothed scale forever
             if entry["lo"] is None:
                 entry["lo"], entry["hi"] = lo, hi
             entry["lo"] += SCALE_SMOOTHING * (lo - entry["lo"])

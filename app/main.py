@@ -22,6 +22,9 @@ def main():
     args = parser.parse_args()
 
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
+    # The web server logs every request (~8/s per open tab for the camera images), which
+    # buries the sensor warnings. Only show its warnings and errors.
+    logging.getLogger("werkzeug").setLevel(logging.WARNING)
     log = logging.getLogger("main")
     load_env()
     cfg = load_config(args.config)

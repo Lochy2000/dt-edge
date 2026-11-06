@@ -41,8 +41,17 @@ class LeptonAdapter(Adapter):
         ok, frame = self.cap.read()
         if not ok:
             raise RuntimeError("no frame from camera")
+        # Raw Y16 frames are 16-bit. Anything else means OpenCV ignored the Y16 request and
+        # sent a colour picture, which would otherwise show as nonsense temperatures.
+        if frame.dtype != np.uint16:
+            raise RuntimeError(f"camera sent {frame.dtype} {frame.shape}, not raw 16-bit (Y16) frames")
         # Raw values are 1/100ths of a kelvin; extra rows (telemetry) are dropped.
         data = frame.astype(np.float32).reshape(-1, 160)[:120] / 100 - 273.15
+        # With radiometry off the camera sends raw 14-bit counts (~8000), which convert to about
+        # -190 degC. Catch that, and any other impossible values, instead of displaying them.
+        median = float(np.median(data))
+        if not -40 < median < 600:
+            raise RuntimeError(f"implausible temperatures (median {median:.0f} degC); is radiometry (TLinear) on?")
         return frame_with_summary(self, data, now_utc())
 
     def close(self):
