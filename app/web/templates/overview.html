@@ -37,14 +37,16 @@
       <select id="cam-select" title="Camera"></select>
       <button class="icon-btn" id="cam-full" type="button" title="Full screen">⤢</button>
     </div>
-    <div class="thermal" id="thermal-box">
-      <div class="frame"><img id="cam-img" alt="thermal image"><div class="frame-msg" id="cam-msg" hidden></div></div>
-      <div class="scale"><span class="hi" id="cam-hi">--</span><div class="bar"></div><span class="lo" id="cam-lo">--</span></div>
-    </div>
-    <div class="tiles three compact">
-      <div class="tile"><span class="t-label">Min</span><b class="t-value" id="cam-min">—</b></div>
-      <div class="tile"><span class="t-label">Mean</span><b class="t-value" id="cam-mean">—</b></div>
-      <div class="tile"><span class="t-label">Max</span><b class="t-value" id="cam-max">—</b></div>
+    <div class="cam-body">
+      <div class="thermal" id="thermal-box">
+        <div class="frame"><img id="cam-img" alt="thermal image"><div class="frame-msg" id="cam-msg" hidden></div></div>
+        <div class="scale"><span class="hi" id="cam-hi">--</span><div class="bar"></div><span class="lo" id="cam-lo">--</span></div>
+      </div>
+      <div class="cam-stats">
+        <div class="tile"><span class="t-label">Max</span><b class="t-value" id="cam-max">—</b></div>
+        <div class="tile"><span class="t-label">Mean</span><b class="t-value" id="cam-mean">—</b></div>
+        <div class="tile"><span class="t-label">Min</span><b class="t-value" id="cam-min">—</b></div>
+      </div>
     </div>
   </section>
 

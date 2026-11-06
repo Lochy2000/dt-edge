@@ -1,5 +1,8 @@
 # Changelog
 
+## 2026-11-06 — Bigger thermal image
+- Max/Mean/Min moved into a column beside the thermal image (they used to be a full-width row under it, taking height from the image). The image now uses the full panel height; image, scale and stats are centred as one group. Top row rebalanced: Power slightly wider, camera slightly narrower.
+
 ## 2026-11-06 — Overview scales with the screen
 - **Everything scales together**: all sizes are in `rem`, and on the Overview 1rem follows the window size (`max(12.5px, min(0.74vw, 1.6vh))`), so zooming in/out or a bigger/smaller screen keeps the same proportions; graph text and tick spacing follow it (charts rebuild when the scale changes).
 - **Fits one screen down to ~1000 x 480** (CSS px): slimmer header, tighter panels, single-line tiles on short screens.

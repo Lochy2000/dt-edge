@@ -327,3 +327,20 @@ textarea { background: var(--bg); color: var(--text); border: 1px solid var(--li
   .page-overview .tiles .t-value { margin: 0; font-size: 1.2rem; }
   .page-overview .panel { gap: 0.4rem; }
 }
+
+/* ---------- thermal camera v2: image fills the panel height; Max/Mean/Min in a column beside it ---------- */
+.ov-grid { grid-template-columns: 11fr 5fr 4fr; }      /* top: power 11 | camera 9;  bottom: response 16 | environment 4 */
+.cam-body { display: flex; gap: 0.6rem; min-width: 0; }
+.cam-body .thermal { flex: 1 1 auto; min-width: 0; }
+.cam-stats { display: flex; flex-direction: column; gap: 0.5rem; width: 8.5rem; flex-shrink: 0; }
+.cam-stats .tile { flex: 1 1 0; display: flex; flex-direction: column; justify-content: center; }
+@media (max-width: 999px) { .cam-body { flex-direction: column; } .cam-stats { width: auto; flex-direction: row; } }
+@media (min-width: 1000px) and (min-height: 480px) {
+  .page-overview .cam-body { flex: 1 1 0; min-height: 0; }
+  .page-overview .cam-body .thermal { height: 100%; }
+  .page-overview .cam-stats .tile { padding: 0.3rem 0.7rem; }
+}
+@media (min-width: 1000px) and (min-height: 480px) {
+  .page-overview .cam-body { justify-content: center; }        /* image + scale + stats as one centred group */
+  .page-overview .cam-body .thermal { flex: 0 1 auto; }
+}
