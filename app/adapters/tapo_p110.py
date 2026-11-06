@@ -1,10 +1,15 @@
 """TP-Link Tapo P110 smart plug (Wi-Fi): on/off state, power and energy. READ-ONLY.
 
-Untested until the plug is set up. Before enabling it in sensors.yaml:
-  1. Set the plug up in the Tapo phone app on the same Wi-Fi as the Pi
-     and turn on Me > Third-Party Services > Third-Party Compatibility.
-  2. Put the plug's IP in sensors.yaml (`host:`) and your login in .env.
-  3. Test from the terminal first: kasa --host <ip> --username ... --password ... state
+Uses the `tapo` library (not python-kasa). From firmware 1.4.0 the P110 speaks a newer
+protocol (TPAP) unless "Third-Party Compatibility" is switched on in the Tapo app, and
+python-kasa can't speak TPAP. `tapo` >= 0.11.1 speaks both, so the plug works whichever
+way that switch is set.
+
+Before enabling it in sensors.yaml:
+  1. Plug on the same Wi-Fi as the Pi. Find its IP with the Tapo app (Device Info).
+  2. Put the IP in sensors.yaml (`host:`) and your Tapo app login in .env.
+  3. Test:  venv/bin/python -m app.check plug
+Don't update the plug's firmware without re-testing: past updates have broken local access.
 
 Switching the plug on/off is deliberately not here yet: control needs its own
 safety rules (operator enable, fail-safe off, logging) and will be added separately.
@@ -18,36 +23,39 @@ from app.record import Reading, now_utc
 
 class TapoP110Adapter(Adapter):
     def connect(self):
-        from kasa import Credentials, Discover
+        from tapo import ApiClient
 
         user, password = os.environ.get("TAPO_USER"), os.environ.get("TAPO_PASS")
         if not user or not password:
             raise RuntimeError("TAPO_USER / TAPO_PASS missing from .env")
+        # The library is async; this thread gets its own event loop and runs each call to completion.
         self.loop = asyncio.new_event_loop()
-        self.dev = self.loop.run_until_complete(
-            Discover.discover_single(self.cfg["host"], credentials=Credentials(user, password))
-        )
+        client = ApiClient(user, password, timeout_s=5)
+        self.dev = self._run(client.p110(self.cfg["host"]))  # logs in; raises if unreachable or wrong login
+
+    def _run(self, coro):
+        return self.loop.run_until_complete(coro)
 
     def read(self):
-        from kasa import Module
-
-        self.loop.run_until_complete(self.dev.update())
+        info = self._run(self.dev.get_device_info())
+        usage = self._run(self.dev.get_energy_usage())
         ts = now_utc()
-        out = [Reading(self.point("on"), bool(self.dev.is_on), None, ts, source=self.source, label="Power state")]
-        if Module.Energy in self.dev.modules:
-            e = self.dev.modules[Module.Energy]
-            out.append(Reading(self.point("power"), round(float(e.current_consumption or 0), 1), "W", ts,
-                               source=self.source, label="Power"))
-            if e.consumption_today is not None:
-                out.append(Reading(self.point("energy_today"), round(float(e.consumption_today), 3), "KiloW-HR", ts,
-                                   source=self.source, label="Energy today"))
-        return out
+
+        # energy usage gives power in milliwatts (finer than get_current_power's whole watts)
+        if usage.current_power is not None:
+            watts = usage.current_power / 1000
+        else:
+            watts = float(self._run(self.dev.get_current_power()).current_power)
+
+        src = self.source
+        return [
+            Reading(self.point("on"), bool(info.device_on), None, ts, source=src, label="Power state"),
+            Reading(self.point("power"), round(watts, 1), "W", ts, source=src, label="Power"),
+            Reading(self.point("energy_today"), round(usage.today_energy / 1000, 3), "KiloW-HR", ts,
+                    source=src, label="Energy today"),
+        ]
 
     def close(self):
         if getattr(self, "loop", None):
-            try:
-                self.loop.run_until_complete(self.dev.disconnect())
-            except Exception:
-                pass
             self.loop.close()
             self.loop = None

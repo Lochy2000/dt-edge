@@ -15,7 +15,7 @@ sensors ──► adapter (one per type) ──► common reading (v0.1 canonica
 | MLX90640 thermal camera | `mlx90640` | I2C 0x33 |
 | FLIR Lepton 3.5 + PureThermal | `lepton` | USB |
 | Pico TC-08 thermocouple logger | `tc08` | USB (Pico driver) |
-| Tapo P110 smart plug | `tapo_p110` | Wi-Fi, read-only, **untested** |
+| Tapo P110 smart plug | `tapo_p110` | Wi-Fi, read-only (`tapo` library) |
 | Simulated sensor | `simulated` | none (for testing) |
 
 ---
@@ -121,6 +121,8 @@ Each sensor runs in its own thread. If a read fails 3 times in a row, that senso
 | TC-08 not found | Only one program can use it; close test scripts |
 | Pasting into nano does nothing | Use Ctrl+Shift+V, or edit on your PC and `git pull` |
 | BME280 reads warm | It's picking up heat from the Pi; mount it away from the Pi |
+| Plug: "refused the KLAP login" / 403 | Leave **Third-Party Compatibility off** in the Tapo app; the plug then uses TPAP, which the `tapo` library handles. python-kasa can't (shows "Unsupported device … TPAP") |
+| Plug: not found / timeout | Plug and Pi must be on the same Wi-Fi; hotspot IPs change, so re-check the plug's IP in the Tapo app (Device Info) |
 
 ---
 
