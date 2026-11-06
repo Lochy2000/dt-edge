@@ -27,15 +27,16 @@ sensors:
     smooth: true          # false shows the real 32x24 pixels
     scale: auto
 
-  - id: boiler
+  - id: tc08
     type: tc08
-    label: Boiler thermocouples · TC-08
-    poll_s: 1
+    label: Thermocouples · TC-08
+    poll_s: 1             # each channel takes ~0.1 s to read, so 1 s suits up to ~8 channels
     mains_hz: 50          # UK mains
-    channels:             # channel number on the TC-08 -> point; probe type is printed on the plug (usually K)
-      1: {name: water, label: Water (immersion probe), probe: K}
-      2: {name: surface_1, label: Surface 1, probe: K}
-      # 3: {name: surface_2, label: Surface 2, probe: K}
+    channels:             # sockets with a probe plugged in -> probe type (printed on the plug, usually K)
+      1: K                # readings appear as tc08.ch1, tc08.ch2, ...
+      2: K                # labels (Water, Surface...) and positions are set per asset on the dashboard
+      3: K
+      4: K
 
   - id: ambient
     type: bme280
@@ -46,8 +47,8 @@ sensors:
   - id: plug
     type: tapo_p110
     label: Smart plug · Tapo P110
-    enabled: false        # turn on once the plug is set up (see app/adapters/tapo_p110.py)
-    host: 192.168.1.50    # the plug's IP address from the Tapo app
+    # The plug's IP goes in .env as TAPO_HOST (it changes on a phone hotspot, and .env
+    # never clashes with git pull). A host: line here would override it.
     poll_s: 2
 
   - id: demo

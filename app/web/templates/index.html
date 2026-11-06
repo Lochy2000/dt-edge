@@ -16,15 +16,45 @@
       </div>
     </div>
     <div class="summary" id="summary"></div>
+    <a class="btn ghost" href="/runs">Recorded runs</a>
     <div class="clock" id="clock">--:--:--</div>
   </header>
 
+  <!-- Asset (object under test) + recording controls: see controls.js -->
+  <section class="controlbar">
+    <div class="ctl-group">
+      <label class="ctl-label" for="asset-select">Asset</label>
+      <select id="asset-select"></select>
+      <button class="btn ghost" id="probes-btn" type="button">Probes…</button>
+    </div>
+    <div class="ctl-group rec-area" id="rec-area"></div>
+  </section>
+
   <div class="banner" id="banner" hidden>Lost connection to the Pi. Retrying…</div>
+  <div class="toast" id="toast" hidden></div>
 
   <main class="grid" id="grid"></main>
 
-  <footer class="foot">Readings are live only and not saved. Thermal colours auto-scale per camera; compare the numbers, not the colours.</footer>
+  <footer class="foot">Thermal colours auto-scale per camera; compare the numbers, not the colours. Recordings are saved on the Pi (see Recorded runs).</footer>
+
+  <!-- Probe editor: which TC-08 channels are on this asset, and what they're called -->
+  <dialog id="probes-dialog">
+    <form method="dialog" class="dlg">
+      <h2>Probes on <span id="probes-asset"></span></h2>
+      <p class="dlg-sub">Tick the temperature probes placed on this object and name them. Names appear on the cards and in recordings.
+        A channel only lists here once it's in <code>sensors.yaml</code>.</p>
+      <table class="probe-table">
+        <thead><tr><th>Use</th><th>Channel</th><th>Name</th><th>Now</th></tr></thead>
+        <tbody id="probes-body"></tbody>
+      </table>
+      <div class="dlg-actions">
+        <button class="btn ghost" value="cancel">Cancel</button>
+        <button class="btn primary" id="probes-save" value="save">Save</button>
+      </div>
+    </form>
+  </dialog>
 
   <script src="{{ url_for('static', filename='app.js') }}"></script>
+  <script src="{{ url_for('static', filename='controls.js') }}"></script>
 </body>
 </html>

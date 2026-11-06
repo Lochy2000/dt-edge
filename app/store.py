@@ -6,10 +6,13 @@ Status rules:
   LIVE     - data newer than stale_after_s
   STALE    - no new data for longer than stale_after_s
   ERROR    - the last attempt to connect or read failed
-Nothing is saved to disk; this is the "latest value" only.
+The store itself keeps only the latest value. Every new reading is also passed on to:
+  history    - the last hour in RAM, for graphs (app/history.py)
+  listeners  - e.g. the recorder, which writes test runs to disk (app/recorder.py)
 """
 from __future__ import annotations
 
+import logging
 import math
 import threading
 import time
@@ -19,12 +22,15 @@ import numpy as np
 from app.record import Frame, Reading, now_utc
 
 SCALE_SMOOTHING = 0.1  # how fast the auto colour scale follows the image (0-1)
+log = logging.getLogger("store")
 
 
 class Store:
-    def __init__(self, site: str, default_stale_s: float = 5):
+    def __init__(self, site: str, default_stale_s: float = 5, history=None):
         self.site = site
         self.default_stale_s = default_stale_s
+        self.history = history
+        self.listeners = []  # objects with on_readings(msgs) and on_frame(point_id, data, t)
         self._lock = threading.Lock()
         self._sensors: dict[str, dict] = {}
 
@@ -50,17 +56,33 @@ class Store:
     # ---- called by the sensor threads ----
     def update(self, sensor_id: str, items: list[Reading | Frame]):
         ingest = now_utc()
+        msgs, frames = [], []
         with self._lock:
             s = self._sensors[sensor_id]
             for item in items:
                 if isinstance(item, Frame):
                     self._update_frame(s, item)
+                    frames.append(item)
                 else:
                     msg = item.to_message(self.site, ingest)
                     msg["label"] = item.label or item.point_id
                     s["points"][item.point_id] = msg
+                    msgs.append((msg, (item.sensor_time or ingest).timestamp()))
             s["last_ok"] = time.time()
             s["error"] = None
+
+        # Outside the lock, so a slow disk write never holds up the dashboard.
+        if self.history:
+            for msg, t in msgs:
+                self.history.add(msg["point_id"], t, msg["value"])
+        for listener in self.listeners:
+            try:
+                if msgs:
+                    listener.on_readings([m for m, _ in msgs])
+                for fr in frames:
+                    listener.on_frame(fr.point_id, fr.data, fr.sensor_time.timestamp())
+            except Exception:  # noqa: BLE001 - a recorder problem must not stop the sensor
+                log.exception("listener %s failed", type(listener).__name__)
 
     def set_error(self, sensor_id: str, error: str):
         with self._lock:
@@ -91,10 +113,15 @@ class Store:
                     return e["frame"].data.copy(), e["lo"], e["hi"], s["smooth"]
         return None
 
-    def snapshot(self) -> dict:
+    def snapshot(self, labels: dict | None = None) -> dict:
+        """labels: optional point_id -> display name (from the active asset, e.g. tc08.ch1 -> "Water")."""
         now = time.time()
         with self._lock:
             sensors = [self._sensor_view(s, now) for s in self._sensors.values()]
+        if labels:
+            for s in sensors:
+                s["points"] = [{**p, "label": labels[p["point_id"]]} if p["point_id"] in labels else p
+                               for p in s["points"]]
         counts = {}
         for s in sensors:
             counts[s["status"]] = counts.get(s["status"], 0) + 1

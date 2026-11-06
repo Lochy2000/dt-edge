@@ -7,7 +7,7 @@ way that switch is set.
 
 Before enabling it in sensors.yaml:
   1. Plug on the same Wi-Fi as the Pi. Find its IP with the Tapo app (Device Info).
-  2. Put the IP in sensors.yaml (`host:`) and your Tapo app login in .env.
+  2. Put the IP (TAPO_HOST) and your Tapo app login in .env.
   3. Test:  venv/bin/python -m app.check plug
 Don't update the plug's firmware without re-testing: past updates have broken local access.
 
@@ -31,7 +31,10 @@ class TapoP110Adapter(Adapter):
         # The library is async; this thread gets its own event loop and runs each call to completion.
         self.loop = asyncio.new_event_loop()
         client = ApiClient(user, password, timeout_s=5)
-        self.dev = self._run(client.p110(self.cfg["host"]))  # logs in; raises if unreachable or wrong login
+        host = self.cfg.get("host") or os.environ.get("TAPO_HOST")
+        if not host:
+            raise RuntimeError("plug IP missing: set TAPO_HOST in .env")
+        self.dev = self._run(client.p110(host))  # logs in; raises if unreachable or wrong login
 
     def _run(self, coro):
         return self.loop.run_until_complete(coro)

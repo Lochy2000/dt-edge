@@ -21,10 +21,22 @@ class TC08Adapter(Adapter):
             raise RuntimeError("TC-08 not found (check USB; close other programs using it)")
         tc08.usb_tc08_set_mains(self.handle, 0 if int(self.cfg.get("mains_hz", 50)) == 50 else 1)
 
-        # channels: {1: {name: water, label: ..., probe: K}, ...}
-        self.channels = {int(ch): c for ch, c in (self.cfg.get("channels") or {}).items()}
+        # channels: which sockets have a probe plugged in, and its type (printed on the plug, usually K).
+        #   channels: {1: K, 2: K}                    <- normal form; points become tc08.ch1, tc08.ch2
+        #   channels: {1: {probe: K, label: Water}}   <- optional default label
+        # What each probe MEANS (Water, Surface...) is set per asset on the dashboard, not here,
+        # so moving a probe from the kettle to the toaster needs no config change.
+        self.channels = {}
+        for ch, c in (self.cfg.get("channels") or {}).items():
+            c = c if isinstance(c, dict) else {"probe": str(c)}
+            ch = int(ch)
+            if not 1 <= ch <= 8:
+                raise ValueError(f"TC-08 channel {ch} doesn't exist (1-8)")
+            c.setdefault("name", f"ch{ch}")
+            c.setdefault("label", f"Channel {ch}")
+            self.channels[ch] = c
         for ch, c in self.channels.items():
-            tc08.usb_tc08_set_channel(self.handle, ch, ctypes.c_int8(ord(c.get("probe", "K"))))
+            tc08.usb_tc08_set_channel(self.handle, ch, ctypes.c_int8(ord(str(c.get("probe", "K")).upper()[0])))
         self.units = tc08.USBTC08_UNITS["USBTC08_UNITS_CENTIGRADE"]
 
     def read(self):

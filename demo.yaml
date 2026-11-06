@@ -10,13 +10,13 @@ sensors:
     smooth: true
     poll_s: 0.5
 
-  - id: sim_probe
+  - id: sim_tc
     type: simulated
-    label: Simulated probe
+    label: Simulated thermocouples
+    channels: 4           # sim_tc.ch1 ... sim_tc.ch4
     poll_s: 1
 
   - id: plug
     type: tapo_p110
     label: Smart plug · Tapo P110
     enabled: false
-    host: 192.168.1.50

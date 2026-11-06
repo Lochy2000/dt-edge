@@ -122,13 +122,41 @@ Each sensor runs in its own thread. If a read fails 3 times in a row, that senso
 | Pasting into nano does nothing | Use Ctrl+Shift+V, or edit on your PC and `git pull` |
 | BME280 reads warm | It's picking up heat from the Pi; mount it away from the Pi |
 | Plug: "refused the KLAP login" / 403 | Leave **Third-Party Compatibility off** in the Tapo app; the plug then uses TPAP, which the `tapo` library handles. python-kasa can't (shows "Unsupported device … TPAP") |
-| Plug: not found / timeout | Plug and Pi must be on the same Wi-Fi; hotspot IPs change, so re-check the plug's IP in the Tapo app (Device Info) |
+| Plug: not found / timeout | Plug and Pi must be on the same Wi-Fi; hotspot IPs change, so re-check the plug's IP in the Tapo app (Device Info) and update `TAPO_HOST` in `.env` |
 
 ---
 
+## Recording a test run
+
+1. Pick the **Asset** (the object under test) in the bar under the header. Use **Probes…** to tick which thermocouples are on it and name them (Water, Lid, ...).
+2. Type a run name (and notes), leave **save thermal images** ticked if you want them, and press **Start recording**.
+3. While it runs, type a **marker** and press Enter for anything worth noting ("kettle switched off", "lid opened"). Plug on/off changes are logged automatically.
+4. Press **Stop**. Then open **Recorded runs** to download it.
+
+| Download | What it is |
+|---|---|
+| Excel CSV | One row per second, one column per sensor, named with the probe labels. Easiest to chart. |
+| All readings | Every value exactly as it arrived: time, seconds since start, point, label, value, unit, quality |
+| Events | Start/stop, your markers, plug on/off |
+| Zip | The whole run folder, including `meta.json` (asset, probe labels and positions, sensor config, summary) and thermal images (`frames/*.npz`, load with `numpy.load`) |
+
+Runs are saved on the Pi in `data/runs/<date-time>_<name>/`. Energy per run is worked out from the plug's power readings (area under the curve), which is much finer than the plug's own whole-Wh counter. A run stops itself after 6 hours, and won't start with less than 500 MB free.
+
+## Assets and probes
+
+`sensors.yaml` says what **hardware** is plugged in. An **asset profile** says what it **means** for the object under test. So moving the probes from the kettle to a toaster needs no config or code change:
+
+- **New object:** Asset dropdown → **+ New asset…** (starts as a copy of the current one) → **Probes…** to tick and name its probes.
+- **Adding a thermocouple:** plug it into a free TC-08 socket, add the socket number to `channels:` in `sensors.yaml`, restart. It then appears in **Probes…** as `tc08.chN`.
+- Profiles are kept in `data/assets/*.json`. `data/` isn't in Git, so dashboard edits never clash with `git pull`. The example in `assets_default/` is copied in on first start.
+- Each probe also has a position on a picture of the object (x, y in %). Placing them on the dashboard comes with the new layout.
+
+The asset can't be changed during a recording: the run saves the probe labels it started with.
+
 ## Not built yet (deliberately)
 
-- Graphs and history (nothing is saved)
+- Graphs (the last hour is already kept in memory and served at `/api/history`; the new layout will chart it)
+- Placing probe dots on a picture of the object
 - Publishing to MQTT / the v0.1 gateway
 - Switching the Tapo plug. Control needs its own safety rules (operator enable, fail-safe off on stale data, logging) first
 - Docker packaging
@@ -136,5 +164,5 @@ Each sensor runs in its own thread. If a read fails 3 times in a row, that senso
 
 ## Security notes
 
-- The dashboard is read-only and has no login. Anyone on the same network can view it, so run it on a trusted network only.
-- Passwords go in `.env`, which Git ignores. Never commit them.
+- There is no login. Anyone on the same network can view the dashboard **and** start/stop recordings or edit assets, so run it on a trusted network only.
+- Passwords (and the plug's IP) go in `.env`, which Git ignores. Never commit them.

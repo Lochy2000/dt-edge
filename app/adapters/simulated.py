@@ -23,6 +23,11 @@ class SimulatedAdapter(Adapter):
         temp = 20 + 35 * (1 + math.sin(t / 30)) / 2 + random.gauss(0, 0.2)  # 20-55 degC cycle
         ts = now_utc()
         out = [Reading(self.point("temp"), round(temp, 2), "DEG_C", ts, source=self.source, label="Temperature")]
+        # channels: N -> pretend to be an N-channel thermocouple logger (ch1 hottest, each next one cooler)
+        n = int(self.cfg.get("channels", 0))
+        if n:
+            out = [Reading(self.point(f"ch{i}"), round(20 + (temp - 20) * (1 - 0.2 * (i - 1)) + random.gauss(0, 0.1), 2),
+                           "DEG_C", ts, source=self.source, label=f"Channel {i}") for i in range(1, n + 1)]
 
         if self.cfg.get("image", False):
             yy, xx = np.mgrid[0:24, 0:32]

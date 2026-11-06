@@ -22,13 +22,13 @@ def now_utc() -> datetime:
 class Reading:
     """One value from one point, e.g. ambient.air_temp = 21.6 DEG_C."""
 
-    point_id: str                         # "<sensor id>.<metric>", e.g. "boiler.water"
+    point_id: str                         # "<sensor id>.<metric>", e.g. "tc08.ch1"
     value: float | str | bool | None      # None only when quality is BAD
     unit: str | None = None               # QUDT id: DEG_C, PERCENT_RH, HectoPA, W, KiloW-HR
     sensor_time: datetime | None = None   # when it was measured (None = use arrival time)
     quality: str = "GOOD"                 # GOOD / SUSPECT / BAD
     qc: list[str] = field(default_factory=list)  # reasons, if quality isn't GOOD
-    source: str | None = None             # e.g. "tc08:boiler"
+    source: str | None = None             # e.g. "tc08:tc08"
     label: str | None = None              # display name only, not part of the message
 
     def to_message(self, site: str, ingest_time: datetime) -> dict:

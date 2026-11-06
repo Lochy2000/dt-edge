@@ -1,7 +1,7 @@
 """Test ONE sensor on its own, before it goes on the dashboard.
 
     python -m app.check ambient          # sensor id from sensors.yaml
-    python -m app.check boiler -n 10     # take 10 readings
+    python -m app.check tc08 -n 10       # take 10 readings
 
 Prints each reading in the canonical message format, so you can see exactly
 what the rest of the system will receive. Stop the dashboard first if it is

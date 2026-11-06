@@ -118,6 +118,8 @@ async function tick() {
       updateCard(c, s);
     }
     updateSummary(state.counts);
+    // recording bar etc. (controls.js); its own errors must not show the "lost connection" banner
+    if (window.onState) { try { window.onState(state); } catch (err) { console.error(err); } }
   } catch (e) {
     document.getElementById("banner").hidden = false;
   }

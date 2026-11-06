@@ -23,7 +23,7 @@ class Adapter:
         self.id = cfg["id"]
 
     def point(self, metric: str) -> str:
-        """Builds a point id, e.g. point("water") -> "boiler.water"."""
+        """Builds a point id, e.g. point("ch1") -> "tc08.ch1"."""
         return f"{self.id}.{metric}"
 
     @property
