@@ -292,6 +292,15 @@ class Recorder:
         w.writerows(lines)
         return "".join(out)
 
+    def delete_run(self, run_id: str) -> None:
+        """Permanently remove a run's folder (and any zip made from it) from the SD card."""
+        d = self.run_dir(run_id)
+        if self.is_active(run_id):
+            raise RecorderError("can't delete a run that is still recording; stop it first")
+        shutil.rmtree(d)
+        (self.exports / f"{run_id}.zip").unlink(missing_ok=True)
+        log.info("run deleted: %s", run_id)
+
     def zip_path(self, run_id: str) -> Path:
         d = self.run_dir(run_id)
         if self.is_active(run_id):

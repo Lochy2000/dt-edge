@@ -344,3 +344,7 @@ textarea { background: var(--bg); color: var(--text); border: 1px solid var(--li
   .page-overview .cam-body { justify-content: center; }        /* image + scale + stats as one centred group */
   .page-overview .cam-body .thermal { flex: 0 1 auto; }
 }
+
+/* runs page: delete button */
+.btn.danger { color: #ffb3ad; border-color: color-mix(in srgb, var(--error) 45%, var(--line)); }
+.btn.danger:hover:not(:disabled) { background: color-mix(in srgb, var(--error) 15%, transparent); border-color: var(--error); }

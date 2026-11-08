@@ -1,4 +1,4 @@
-// Lists recorded runs (newest first) with download links. Refreshes every 5 s.
+// Lists recorded runs (newest first) with download links and a delete button. Refreshes every 5 s.
 
 function esc(s) {
   return String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
@@ -16,7 +16,7 @@ async function load() {
   try {
     const runs = await (await fetch("/api/runs", { cache: "no-store" })).json();
     if (!runs.length) {
-      body.innerHTML = `<tr><td colspan="8" class="dim">No runs yet. Start one from the live dashboard.</td></tr>`;
+      body.innerHTML = `<tr><td colspan="9" class="dim">No runs yet. Start one from the live dashboard.</td></tr>`;
       return;
     }
     body.innerHTML = runs.map(r => {
@@ -33,12 +33,30 @@ async function load() {
         <td class="mono">${r.rows == null ? "…" : r.rows.toLocaleString()}</td>
         <td class="mono">${r.energy_wh == null ? "—" : r.energy_wh.toFixed(1) + " Wh"}</td>
         <td class="mono">${r.size_mb < 0.1 ? "<0.1" : r.size_mb} MB</td>
-        <td>${links}</td></tr>`;
+        <td>${links}</td>
+        <td>${r.recording ? "" : `<button class="btn ghost danger" type="button" data-del="${esc(r.id)}" data-name="${esc(r.name)}">Delete</button>`}</td></tr>`;
     }).join("");
   } catch (e) {
-    body.innerHTML = `<tr><td colspan="8" class="err">Couldn't load runs: ${esc(e.message)}</td></tr>`;
+    body.innerHTML = `<tr><td colspan="9" class="err">Couldn't load runs: ${esc(e.message)}</td></tr>`;
   }
 }
 
 load();
 setInterval(load, 5000);
+
+// Delete: ask first (it's permanent), then remove the row by reloading the list.
+document.getElementById("runs-body").addEventListener("click", async (e) => {
+  const btn = e.target.closest("[data-del]");
+  if (!btn) return;
+  if (!confirm(`Delete "${btn.dataset.name}"?\n\nThis permanently removes the recording (readings, events and thermal images) from the Pi. It can't be undone.`)) return;
+  btn.disabled = true;
+  try {
+    const res = await fetch(`/api/runs/${encodeURIComponent(btn.dataset.del)}`, { method: "DELETE" });
+    const json = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(json.error || `delete failed (${res.status})`);
+  } catch (err) {
+    alert(err.message);
+    btn.disabled = false;
+  }
+  load();
+});

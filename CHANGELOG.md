@@ -1,5 +1,8 @@
 # Changelog
 
+## 2026-11-06 — Delete recordings
+- **Delete** button per run on Recorded runs (`DELETE /api/runs/<id>`): asks for confirmation, then permanently removes the run folder (readings, events, thermal images) and any zip made from it. Refused while the run is still recording.
+
 ## 2026-11-06 — Bigger thermal image
 - Max/Mean/Min moved into a column beside the thermal image (they used to be a full-width row under it, taking height from the image). The image now uses the full panel height; image, scale and stats are centred as one group. Top row rebalanced: Power slightly wider, camera slightly narrower.
 

@@ -156,7 +156,7 @@ The graphs use [uPlot](https://github.com/leeoniya/uPlot) (MIT), stored in `app/
 | Events | Start/stop, your markers, plug on/off |
 | Zip | The whole run folder, including `meta.json` (asset, probe labels and positions, sensor config, summary) and thermal images (`frames/*.npz`, load with `numpy.load`) |
 
-Runs are saved on the Pi in `data/runs/<date-time>_<name>/`. Energy per run is worked out from the plug's power readings (area under the curve), which is much finer than the plug's own whole-Wh counter. A run stops itself after 6 hours, and won't start with less than 500 MB free.
+Runs are saved on the Pi in `data/runs/<date-time>_<name>/`. **Delete** on the Recorded runs page removes a run permanently (it asks first; not possible while it's recording). Energy per run is worked out from the plug's power readings (area under the curve), which is much finer than the plug's own whole-Wh counter. A run stops itself after 6 hours, and won't start with less than 500 MB free.
 
 ## Assets and probes
 

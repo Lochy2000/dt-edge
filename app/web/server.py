@@ -25,6 +25,7 @@ Recording
   POST /api/record/marker        {"text": "lid opened"}
   GET  /api/runs                 list of runs
   GET  /api/runs/<id>/meta.json | readings.csv | events.csv | wide.csv | download.zip
+  DELETE /api/runs/<id>          permanently delete a run (not while it's recording)
 
 There is no login: anyone on the same network can view AND start/stop recordings or
 edit assets. Run it on a trusted network only.
@@ -161,6 +162,11 @@ def create_app(store, assets, recorder) -> Flask:
     @app.get("/api/runs")
     def list_runs():
         return jsonify(recorder.list_runs())
+
+    @app.delete("/api/runs/<run_id>")
+    def delete_run(run_id):
+        recorder.delete_run(run_id)
+        return jsonify(deleted=run_id)
 
     @app.get("/api/runs/<run_id>/<name>")
     def run_file(run_id, name):
