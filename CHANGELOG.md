@@ -1,5 +1,10 @@
 # Changelog
 
+## 2026-11-08 — Calibrate tab (thermal camera vs thermocouple, step 1)
+- **New Calibrate page** (`/calibrate`, `calibration.py`, `calibrate.js`): pick a session (camera + reference TC + tape patch size), enter the distance, click the patch on the live image (real pixels), see TC vs box mean/max, background ring, error and loss live; **Capture point** averages N s and saves it. Points table, delete, CSV export. Measures only; live readings are not corrected.
+- Each point stores the averaged camera image (`data/calibration/<session>/p001.npy`) so the box can be re-picked later.
+- `hfov_deg: 57` added to the Lepton in `sensors.yaml` (expected patch size in pixels). `/api/frame/<id>.png?smooth=0` shows unsmoothed pixels. `Store.latest(point_id)`.
+
 ## 2026-11-06 — Delete recordings
 - **Delete** button per run on Recorded runs (`DELETE /api/runs/<id>`): asks for confirmation, then permanently removes the run folder (readings, events, thermal images) and any zip made from it. Refused while the run is still recording.
 

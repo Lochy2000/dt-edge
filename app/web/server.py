@@ -4,10 +4,11 @@ Pages
   /                              overview: power, thermal camera, probe graphs, asset picture
   /sensors                       every sensor as a card, with its status (health check view)
   /runs                          list of recorded test runs, with downloads
+  /calibrate                     thermal camera calibration against a thermocouple (app/calibration.py)
 
 Live data
   GET  /api/state                latest readings + status for every sensor, recording status, active asset
-  GET  /api/frame/<id>.png       latest thermal image, coloured
+  GET  /api/frame/<id>.png       latest thermal image, coloured (?smooth=0 shows the real pixels)
   GET  /api/history?points=a,b&minutes=30    recent values for graphs (from RAM)
   GET  /api/history?points=a,b&since=<epoch> only values newer than that (for live updates)
 
@@ -27,6 +28,17 @@ Recording
   GET  /api/runs/<id>/meta.json | readings.csv | events.csv | wide.csv | download.zip
   DELETE /api/runs/<id>          permanently delete a run (not while it's recording)
 
+Calibration (one session = one camera + one reference thermocouple + one patch size)
+  GET  /api/calibration/cameras
+  GET  /api/calibration/sessions                 list
+  POST /api/calibration/sessions                 {"name", "camera", "probe", "patch_mm", "notes"}
+  GET  /api/calibration/sessions/<id>            setup + captured points
+  DELETE /api/calibration/sessions/<id>
+  GET  /api/calibration/sessions/<id>/live?box=x,y,w,h&distance=1.5   live numbers for the box
+  POST /api/calibration/sessions/<id>/capture    {"distance_m", "box": [x,y,w,h], "seconds"} (waits)
+  DELETE /api/calibration/sessions/<id>/points/<n>
+  GET  /api/calibration/sessions/<id>/points.csv
+
 There is no login: anyone on the same network can view AND start/stop recordings or
 edit assets. Run it on a trusted network only.
 """
@@ -37,6 +49,7 @@ import numpy as np
 from flask import Flask, Response, abort, jsonify, render_template, request, send_file
 
 from app.assets import AssetError
+from app.calibration import CalibrationError
 from app.recorder import RecorderError
 
 FRAME_WIDTH = 480  # pixels; images are scaled up to this width
@@ -53,13 +66,14 @@ def render_frame(data: np.ndarray, lo: float, hi: float, smooth: bool) -> bytes:
     return buf.tobytes()
 
 
-def create_app(store, assets, recorder) -> Flask:
+def create_app(store, assets, recorder, calibration) -> Flask:
     app = Flask(__name__)
 
     # Mistakes in a request (bad asset id, already recording, ...) come back as
     # {"error": "..."} with status 400, and the dashboard shows the message.
     @app.errorhandler(AssetError)
     @app.errorhandler(RecorderError)
+    @app.errorhandler(CalibrationError)
     def user_error(e):
         return jsonify(error=str(e)), 400
 
@@ -79,6 +93,10 @@ def create_app(store, assets, recorder) -> Flask:
     def runs_page():
         return render_template("runs.html", site=store.site, page="runs")
 
+    @app.get("/calibrate")
+    def calibrate_page():
+        return render_template("calibrate.html", site=store.site, page="calibrate")
+
     # ------------------------------------------------------------ live data
     @app.get("/api/state")
     def state():
@@ -94,6 +112,8 @@ def create_app(store, assets, recorder) -> Flask:
         if found is None:
             abort(404)
         data, lo, hi, smooth = found
+        if request.args.get("smooth") == "0":
+            smooth = False
         return Response(render_frame(data, lo, hi, smooth), mimetype="image/png",
                         headers={"Cache-Control": "no-store"})
 
@@ -181,5 +201,49 @@ def create_app(store, assets, recorder) -> Flask:
             return send_file(recorder.zip_path(run_id), as_attachment=True,
                              download_name=f"{run_id}.zip", max_age=0)
         abort(404)
+
+    # ---------------------------------------------------------- calibration
+    @app.get("/api/calibration/cameras")
+    def calib_cameras():
+        return jsonify(calibration.cameras())
+
+    @app.get("/api/calibration/sessions")
+    def calib_list():
+        return jsonify(calibration.list())
+
+    @app.post("/api/calibration/sessions")
+    def calib_create():
+        b = body()
+        return jsonify(calibration.create(str(b.get("name", "")), str(b.get("camera", "")), str(b.get("probe", "")),
+                                          b.get("patch_mm", 50), str(b.get("notes", "")), assets.active()))
+
+    @app.get("/api/calibration/sessions/<sid>")
+    def calib_get(sid):
+        return jsonify(calibration.get(sid))
+
+    @app.delete("/api/calibration/sessions/<sid>")
+    def calib_delete(sid):
+        calibration.delete(sid)
+        return jsonify(deleted=sid)
+
+    @app.get("/api/calibration/sessions/<sid>/live")
+    def calib_live(sid):
+        box = request.args.get("box", "0,0,1,1").split(",")
+        return jsonify(calibration.live(sid, box, request.args.get("distance", type=float)))
+
+    @app.post("/api/calibration/sessions/<sid>/capture")
+    def calib_capture(sid):
+        b = body()
+        return jsonify(calibration.capture(sid, b.get("distance_m"), b.get("box"), b.get("seconds", 10)))
+
+    @app.delete("/api/calibration/sessions/<sid>/points/<int:n>")
+    def calib_delete_point(sid, n):
+        calibration.delete_point(sid, n)
+        return jsonify(calibration.get(sid))
+
+    @app.get("/api/calibration/sessions/<sid>/points.csv")
+    def calib_csv(sid):
+        return Response(calibration.csv(sid), mimetype="text/csv",
+                        headers={"Content-Disposition": f'attachment; filename="{sid}_calibration.csv"'})
 
     return app

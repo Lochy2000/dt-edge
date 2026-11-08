@@ -11,6 +11,7 @@ from pathlib import Path
 
 from app import registry
 from app.assets import Assets
+from app.calibration import Calibration
 from app.config import ROOT, load_config, load_env
 from app.history import History
 from app.recorder import Recorder
@@ -40,6 +41,8 @@ def main():
     assets = Assets(data_dir, ROOT / "assets_default")
     recorder = Recorder(data_dir, cfg["site"], copy.deepcopy(cfg["sensors"]))
     store.listeners.append(recorder)
+    calibration = Calibration(data_dir, store, copy.deepcopy(cfg["sensors"]))
+    store.listeners.append(calibration)
     runners = []
     for s in cfg["sensors"]:
         enabled = s.get("enabled", True)
@@ -59,7 +62,7 @@ def main():
 
     log.info("dashboard on http://%s:%d", args.host, args.port)
     try:
-        create_app(store, assets, recorder).run(host=args.host, port=args.port, threaded=True, use_reloader=False)
+        create_app(store, assets, recorder, calibration).run(host=args.host, port=args.port, threaded=True, use_reloader=False)
     finally:
         if recorder.status()["recording"]:
             recorder.stop("dashboard shut down")  # closes the files cleanly on Ctrl+C

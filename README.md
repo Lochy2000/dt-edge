@@ -107,6 +107,28 @@ Each sensor runs in its own thread. If a read fails 3 times in a row, that senso
 
 ---
 
+## Calibrating the thermal camera (Calibrate tab)
+
+Measures how far the camera is from a thermocouple, and how that changes with distance. Nothing here changes live readings; it only measures (details and maths: `app/calibration.py`).
+
+**Set-up:** tape a matte black patch (e.g. 50 x 50 mm electrical tape) over a thermocouple on the asset, so the camera sees a surface it reads well. Keep the camera square on to the patch.
+
+1. **New...** session: camera, reference thermocouple (from the asset's probes), patch width in mm.
+2. Enter the **distance** (m) and **click the patch** on the image. The image shows real pixels; the dashed square is where the patch should be at that distance, the dotted ring is the background it gets blended with.
+3. **Capture point** averages 10 s (TC, box mean/max, background) and saves it. Repeat at each distance, ideally at a steady temperature.
+4. **Download CSV** for analysis.
+
+| Column | Meaning |
+|---|---|
+| error | camera − thermocouple, degC |
+| loss | (TC − camera) / (TC − background): the share of the patch-to-background difference the camera lost. 0 % = perfect, 100 % = reads like the background. Carries over to other assets |
+| patch | how many pixels wide the patch should be, from `hfov_deg` in `sensors.yaml` (Lepton 3.5 = 57) |
+| noise | how much the box average wobbled frame to frame |
+
+Warnings flag a patch under ~3 px, a box bigger than the patch, a TC changing > 1 degC/min, and too little patch-to-background difference for loss to mean anything. Sessions are saved in `data/calibration/`, with the averaged image for each point (`p001.npy`) so the box can be re-picked later.
+
+---
+
 ## Troubleshooting (lessons from the first rig setup)
 
 | Problem | Fix |

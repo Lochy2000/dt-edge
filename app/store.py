@@ -113,6 +113,15 @@ class Store:
                     return e["frame"].data.copy(), e["lo"], e["hi"], s["smooth"]
         return None
 
+    def latest(self, point_id: str):
+        """The latest value of one point (e.g. "tc08.ch1"), or None if there isn't one yet."""
+        with self._lock:
+            for s in self._sensors.values():
+                if point_id in s["points"]:
+                    v = s["points"][point_id]["value"]
+                    return v if isinstance(v, (int, float)) and not isinstance(v, bool) and math.isfinite(v) else None
+        return None
+
     def snapshot(self, labels: dict | None = None) -> dict:
         """labels: optional point_id -> display name (from the active asset, e.g. tc08.ch1 -> "Water")."""
         now = time.time()

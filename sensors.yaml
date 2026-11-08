@@ -18,6 +18,7 @@ sensors:
     device: auto          # finds the PureThermal by name; or a number, e.g. 0
     poll_s: 0.1
     scale: auto           # or a fixed range in degC, e.g. [20, 100]
+    hfov_deg: 57          # horizontal field of view; the Calibrate page uses it to work out patch size in pixels
 
   - id: mlx
     type: mlx90640

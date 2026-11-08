@@ -348,3 +348,34 @@ textarea { background: var(--bg); color: var(--text); border: 1px solid var(--li
 /* runs page: delete button */
 .btn.danger { color: #ffb3ad; border-color: color-mix(in srgb, var(--error) 45%, var(--line)); }
 .btn.danger:hover:not(:disabled) { background: color-mix(in srgb, var(--error) 15%, transparent); border-color: var(--error); }
+
+/* ---------- calibrate page (calibrate.html / calibrate.js) ---------- */
+.calib {
+  padding: 1.1429rem; display: grid; gap: 0.8571rem;
+  grid-template-columns: minmax(0, 1.25fr) minmax(20rem, 1fr);
+  grid-template-areas: "img side" "pts pts";
+}
+.cal-image { grid-area: img; }
+.cal-side { grid-area: side; }
+.cal-points { grid-area: pts; }
+@media (max-width: 899px) { .calib { grid-template-columns: 1fr; grid-template-areas: "img" "side" "pts"; } }
+.cal-imgwrap { position: relative; align-self: center; width: 100%; max-width: 48rem; cursor: crosshair; outline: none; line-height: 0; }
+.cal-imgwrap:focus-visible { outline: 1px solid #1f6feb; }
+.cal-imgwrap img { width: 100%; image-rendering: pixelated; border-radius: 0.4286rem; background: #000; aspect-ratio: 4 / 3; }
+.cal-imgwrap canvas { position: absolute; inset: 0; pointer-events: none; }
+.cal-key { display: inline-block; width: 1.4rem; height: 0; vertical-align: middle; margin-left: 0.3rem; border-top: 2px solid #3fd0c9; }
+.cal-key.dashed { border-top: 2px dashed #58a6ff; }
+.cal-key.ring { border-top: 2px dotted rgba(255,255,255,0.7); }
+.cal-capture { display: grid; grid-template-columns: 1fr 1fr auto; gap: 0.5714rem; align-items: end; }
+.cal-capture .field { margin-bottom: 0; }
+.cal-capture .btn { height: 2.3rem; white-space: nowrap; }
+.cal-live { display: grid; grid-template-columns: 1fr 1fr; gap: 0.4286rem; }
+.cal-live > div { background: var(--panel-2); border: 1px solid var(--line); border-radius: 0.5rem; padding: 0.4286rem 0.6429rem; display: flex; flex-direction: column; gap: 0.1429rem; }
+.cal-live span { color: var(--dim); font-size: 0.7857rem; }
+.cal-live b { font-family: var(--mono); font-size: 1.1429rem; font-weight: 600; }
+.cal-warn { margin: 0; padding-left: 1.1rem; color: var(--stale); font-size: 0.8571rem; }
+.cal-warn:empty { display: none; }
+.cal-table-wrap { overflow-x: auto; }
+.cal-table td, .cal-table th { white-space: nowrap; }
+.cal-table td.warn { color: var(--stale); white-space: normal; min-width: 14rem; }
+.cal-points .panel-head .btn { padding: 0.2857rem 0.7143rem; font-size: 0.8571rem; text-decoration: none; }

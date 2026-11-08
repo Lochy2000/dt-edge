@@ -1,0 +1,93 @@
+{% extends "base.html" %}
+{% block title %}Calibrate · DT-TEO Edge Rig{% endblock %}
+{% block content %}
+  <main class="calib">
+    <!-- Left: live camera image (real pixels, not smoothed) with the box drawn over it -->
+    <section class="panel cal-image">
+      <div class="panel-head">
+        <h2>Live image</h2>
+        <span class="pstat dim" id="cal-cam-label"></span>
+        <label class="check">Box
+          <select id="cal-box-size">
+            <option value="1">1 × 1</option><option value="3" selected>3 × 3</option>
+            <option value="5">5 × 5</option><option value="7">7 × 7</option><option value="9">9 × 9</option>
+          </select>
+        </label>
+      </div>
+      <div class="cal-imgwrap" id="cal-imgwrap" tabindex="0" title="Click the tape patch. Arrow keys nudge the box.">
+        <img id="cal-img" alt="Thermal image">
+        <canvas id="cal-overlay"></canvas>
+      </div>
+      <p class="dim small">Click the tape patch to place the box (arrow keys nudge it).
+        <span class="cal-key solid"></span> box &nbsp; <span class="cal-key dashed"></span> where the patch should be at this distance &nbsp;
+        <span class="cal-key ring"></span> background ring</p>
+    </section>
+
+    <!-- Right: session, distance + capture, live numbers -->
+    <section class="panel cal-side">
+      <div class="panel-head">
+        <h2>Session</h2>
+        <select id="cal-session" title="Calibration session"></select>
+        <button class="btn ghost" id="cal-new" type="button">New…</button>
+      </div>
+      <p class="dim small" id="cal-session-info">Start a session: pick the camera, the reference thermocouple and the patch size.</p>
+
+      <div class="cal-capture">
+        <label class="field"><span>Distance (m)</span><input id="cal-distance" type="number" min="0.05" max="50" step="0.05" placeholder="e.g. 1.0"></label>
+        <label class="field"><span>Average over (s)</span><input id="cal-seconds" type="number" min="3" max="60" step="1" value="10"></label>
+        <button class="btn primary" id="cal-capture" type="button" disabled>Capture point</button>
+      </div>
+
+      <div class="cal-live" id="cal-live">
+        <div><span>Thermocouple</span><b id="lv-probe">—</b></div>
+        <div><span>Camera box mean</span><b id="lv-mean">—</b></div>
+        <div><span>Camera box max</span><b id="lv-max">—</b></div>
+        <div><span>Background ring</span><b id="lv-bg">—</b></div>
+        <div><span>Error (mean / max)</span><b id="lv-err">—</b></div>
+        <div><span>Loss (mean / max)</span><b id="lv-loss">—</b></div>
+        <div><span>Patch should be</span><b id="lv-patch">—</b></div>
+        <div><span>Room air</span><b id="lv-amb">—</b></div>
+      </div>
+      <ul class="cal-warn" id="cal-warn"></ul>
+      <p class="dim small"><b>Error</b> = camera − thermocouple. <b>Loss</b> = share of the patch-to-background difference the camera lost
+        (0 % perfect, 100 % reads like the background); this is the number that carries over to other assets.</p>
+    </section>
+
+    <!-- Bottom: captured points -->
+    <section class="panel cal-points">
+      <div class="panel-head">
+        <h2>Captured points</h2>
+        <span class="pstat"></span>
+        <a class="btn ghost" id="cal-csv" href="#" hidden>Download CSV</a>
+        <button class="btn ghost danger" id="cal-del-session" type="button" hidden>Delete session</button>
+      </div>
+      <div class="cal-table-wrap">
+        <table class="runs-table cal-table">
+          <thead><tr><th>#</th><th>Distance</th><th>Patch</th><th>Thermocouple</th><th>Box mean</th><th>Box max</th>
+            <th>Background</th><th>Error mean</th><th>Error max</th><th>Loss mean</th><th>Loss max</th><th>Noise</th><th>Warnings</th><th></th></tr></thead>
+          <tbody id="cal-points-body"><tr><td colspan="14" class="dim">No session selected.</td></tr></tbody>
+        </table>
+      </div>
+    </section>
+  </main>
+
+  <!-- New session -->
+  <dialog id="cal-dialog">
+    <form method="dialog" class="dlg">
+      <h2>New calibration session</h2>
+      <p class="dlg-sub">One session = one camera, one reference thermocouple and one patch size. Capture a point at each distance.</p>
+      <label class="field"><span>Name</span><input id="cs-name" maxlength="80" placeholder="e.g. Lepton vs TC1, 50 mm tape, kettle"></label>
+      <label class="field"><span>Camera</span><select id="cs-camera"></select></label>
+      <label class="field"><span>Reference thermocouple <span class="dim">(under the tape patch)</span></span><select id="cs-probe"></select></label>
+      <label class="field"><span>Patch width (mm)</span><input id="cs-patch" type="number" min="1" max="1000" value="50"></label>
+      <label class="field"><span>Notes <span class="dim">(optional)</span></span><textarea id="cs-notes" rows="2" maxlength="2000" placeholder="Tape type, target temperature, camera height/angle..."></textarea></label>
+      <div class="dlg-actions">
+        <button class="btn ghost" value="cancel">Cancel</button>
+        <button class="btn primary" id="cs-create" value="create">Create</button>
+      </div>
+    </form>
+  </dialog>
+{% endblock %}
+{% block scripts %}
+  <script src="{{ url_for('static', filename='calibrate.js') }}"></script>
+{% endblock %}
