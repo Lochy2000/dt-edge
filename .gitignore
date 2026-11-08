@@ -4,3 +4,5 @@ __pycache__/
 *.pyc
 # recordings, asset profiles edited on the dashboard, exports
 data/
+# this Pi's own sensor settings (see sensors.local.example.yaml)
+*.local.yaml

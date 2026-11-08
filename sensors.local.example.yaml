@@ -1,0 +1,18 @@
+# Changes for THIS Pi only. Copy it and edit the copy:
+#   cp sensors.local.example.yaml sensors.local.yaml
+# sensors.local.yaml is not in Git, so editing it never blocks `git pull`.
+# List only what differs from sensors.yaml, by sensor id. Restart the dashboard after editing:
+#   sudo systemctl restart dt-edge
+# The log shows what was applied:  journalctl -u dt-edge -n 20
+
+sensors:
+  plug:
+    enabled: false        # test rig: no smart plug (and no Wi-Fi to reach it)
+
+  # Examples (remove the # to use):
+  # mlx:
+  #   enabled: false      # MLX90640 not plugged in
+  # ambient:
+  #   enabled: false      # BME280 not plugged in
+  # lepton:
+  #   poll_s: 0.2

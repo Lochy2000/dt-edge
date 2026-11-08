@@ -8,7 +8,8 @@
 - **Click the thermal image** for the temperature under the pointer (`GET /api/frame/<id>/at?x=&y=`, % of the image; 3 x 3 pixel mean on the Lepton).
 - **Camera spots** (`app/spots.py`, asset `spots`): fixed points on a thermal image, read every frame and fed to the store as `<camera>.spot<n>`, so they show in Thermal response (dashed), `/api/state` and recordings. Edit with **Spots** on the thermal panel.
 - Graphs can show **2 h / 3 h** (history kept for 180 min); recordings auto-stop after **12 h** (was 6).
-- `demo.yaml`: second simulated camera (`mlx`) so the comparison works without hardware. `sensors.yaml`: smart plug disabled for the test rig (set `enabled: true` for the kettle).
+- `demo.yaml`: second simulated camera (`mlx`) so the comparison works without hardware.
+- **`sensors.local.yaml`** (not in Git, `app/config.py`): this Pi's own changes to `sensors.yaml`, listed by sensor id (e.g. `plug: {enabled: false}`), so editing settings on the Pi no longer blocks `git pull`. Example in `sensors.local.example.yaml`.
 
 ## 2026-11-08 — Calibrate tab (thermal camera vs thermocouple, step 1)
 - **New Calibrate page** (`/calibrate`, `calibration.py`, `calibrate.js`): pick a session (camera + reference TC + tape patch size), enter the distance, click the patch on the live image (real pixels), see TC vs box mean/max, background ring, error and loss live; **Capture point** averages N s and saves it. Points table, delete, CSV export. Measures only; live readings are not corrected.

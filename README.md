@@ -50,7 +50,17 @@ No hardware? Run `./run.sh --config demo.yaml` for simulated sensors only. This 
 cd ~/dt-edge && git pull
 ```
 
-Then restart `./run.sh`. Only re-run `./setup.sh` if `requirements.txt` changed.
+Then restart (`sudo systemctl restart dt-edge`, or `./run.sh`). Only re-run `./setup.sh` if `requirements.txt` changed.
+
+**Changing sensor settings on the Pi:** don't edit `sensors.yaml` there (that's what makes `git pull` refuse). Put this Pi's changes in `sensors.local.yaml` instead, which isn't in Git:
+
+```bash
+cp sensors.local.example.yaml sensors.local.yaml   # once
+nano sensors.local.yaml                            # e.g. plug: enabled: false
+sudo systemctl restart dt-edge
+```
+
+It lists only what differs, by sensor id; everything else still comes from `sensors.yaml`, so new sensors arrive with a pull. The log says what it applied (`journalctl -u dt-edge -n 20`). The same works for `demo.local.yaml`.
 
 ---
 

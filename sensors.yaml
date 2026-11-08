@@ -1,5 +1,9 @@
 # Which sensors run, and their settings. Cards on the dashboard follow this order.
 #
+# Don't edit this file on the Pi: put changes for one Pi or one test in sensors.local.yaml
+# (not in Git, so `git pull` never complains). Start from the example:
+#   cp sensors.local.example.yaml sensors.local.yaml
+#
 # Every sensor needs:
 #   id      short unique name; becomes the start of each point id (e.g. ambient.air_temp)
 #   type    which adapter to use (see app/registry.py)
@@ -56,7 +60,6 @@ sensors:
   - id: plug
     type: tapo_p110
     label: Smart plug · Tapo P110
-    enabled: false        # off for the test rig (no plug, no Wi-Fi to reach it); set true for the kettle
     # The plug's IP goes in .env as TAPO_HOST (it changes on a phone hotspot, and .env
     # never clashes with git pull). A host: line here would override it.
     poll_s: 2
