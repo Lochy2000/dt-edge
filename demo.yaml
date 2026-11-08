@@ -13,6 +13,13 @@ sensors:
     poll_s: 0.5
     hfov_deg: 57          # for the Calibrate page (the simulated image is only 32 x 24)
 
+  - id: mlx
+    type: simulated
+    label: Simulated thermal camera 2 (MLX)
+    image: true
+    smooth: true
+    poll_s: 0.5
+
   - id: tc08
     type: simulated
     label: Simulated thermocouples

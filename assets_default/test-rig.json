@@ -1,0 +1,15 @@
+{
+  "id": "test-rig",
+  "name": "Test rig",
+  "power": null,
+  "state": null,
+  "thermal": "lepton.image",
+  "ambient": ["ambient.air_temp", "ambient.humidity", "ambient.pressure"],
+  "image": null,
+  "drawing": "matrix",
+  "panel": "compare",
+  "camera_scale": {},
+  "notes": "Fan matrix in the climate container. Add thermocouples with Probes..., drag the dots onto the matrix, and add camera spots on the thermal image.",
+  "probes": [],
+  "spots": []
+}

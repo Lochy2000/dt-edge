@@ -13,8 +13,13 @@ An asset profile says what that hardware means for this object:
         {"point": "tc08.ch1", "label": "Water", "x": 55, "y": 60},   # x, y = dot position on the drawing, in %
         ...
       ],
-      "drawing": "kettle",              # picture the dots sit on: kettle | generic | photo (uploaded)
-      "water_level": 60                 # kettle drawing: how full, in % of the inside height
+      "drawing": "kettle",              # picture the dots sit on: kettle | matrix | generic | photo (uploaded)
+      "water_level": 60,                # kettle drawing: how full, in % of the inside height
+      "panel": "power",                 # top-left panel: power (smart plug) | compare (camera vs camera)
+      "camera_scale": {"lepton": [0, 35]},   # per camera: fixed colour range in degC, or "auto"
+      "spots": [                        # camera spots: fixed points on a thermal image, read like a probe
+        {"id": 1, "camera": "lepton", "label": "Fan 1", "x": 30, "y": 50}   # x, y in % of the image
+      ]
     }
 
 Switching to a new object = a new profile (made from the dashboard), no code changes.
@@ -31,7 +36,9 @@ import threading
 from pathlib import Path
 
 ID_RE = re.compile(r"^[a-z0-9][a-z0-9_-]{0,40}$")
-DRAWINGS = ("kettle", "generic", "photo")  # built-in 2D drawings, or the uploaded photo
+DRAWINGS = ("kettle", "matrix", "generic", "photo")  # built-in 2D drawings, or the uploaded photo
+PANELS = ("power", "compare")
+MAX_SPOTS = 8
 IMAGE_TYPES = {"image/png": ".png", "image/jpeg": ".jpg", "image/webp": ".webp"}
 MAX_IMAGE_BYTES = 8 * 1024 * 1024
 
@@ -51,9 +58,12 @@ class Assets:
         self.dir.mkdir(parents=True, exist_ok=True)
         self._state_path = Path(data_dir) / "state.json"
         self._lock = threading.Lock()
-        if not any(self.dir.glob("*.json")) and Path(defaults_dir).is_dir():
-            for f in Path(defaults_dir).iterdir():
-                shutil.copy(f, self.dir / f.name)
+        # Built-in profiles (assets_default/) that aren't here yet are copied in, so a new one
+        # (e.g. test-rig) appears after a git pull. Existing profiles are never overwritten.
+        if Path(defaults_dir).is_dir():
+            for f in Path(defaults_dir).glob("*.json"):
+                if not (self.dir / f.name).exists():
+                    shutil.copy(f, self.dir / f.name)
         # Profiles saved before drawings existed: give the kettle the kettle drawing.
         for p in self.dir.glob("*.json"):
             a = json.loads(p.read_text())
@@ -83,8 +93,10 @@ class Assets:
         return self.get(aid) if aid else None
 
     def labels(self, asset: dict | None) -> dict[str, str]:
-        """point_id -> label from the asset's probes (used to relabel cards and recordings)."""
-        return {p["point"]: p["label"] for p in (asset or {}).get("probes", [])}
+        """point_id -> label from the asset's probes and camera spots (used to relabel cards and recordings)."""
+        out = {p["point"]: p["label"] for p in (asset or {}).get("probes", [])}
+        out.update({spot_point(s): s["label"] for s in (asset or {}).get("spots", [])})
+        return out
 
     # ---- writing (from the dashboard) ----
     def set_active(self, asset_id: str) -> None:
@@ -164,5 +176,55 @@ class Assets:
             "notes": str(a.get("notes") or "")[:500],
             "drawing": a.get("drawing") if a.get("drawing") in DRAWINGS else "generic",
             "water_level": min(max(float(a.get("water_level", 60) or 0), 0.0), 100.0),
+            "panel": a.get("panel") if a.get("panel") in PANELS else "power",
+            "camera_scale": _clean_scales(a.get("camera_scale")),
             "probes": probes,
+            "spots": _clean_spots(a.get("spots")),
         }
+
+
+def spot_point(spot: dict) -> str:
+    """Point id of a camera spot, e.g. lepton.spot1. It belongs to the camera, so it shares its status."""
+    return f"{spot['camera']}.spot{spot['id']}"
+
+
+def _clean_scales(v) -> dict:
+    """{"lepton": [lo, hi] | "auto"} -> checked copy (unknown or bad entries dropped)."""
+    out = {}
+    for cam, sc in (v or {}).items() if isinstance(v, dict) else []:
+        if not ID_RE.match(str(cam)):
+            continue
+        if sc == "auto":
+            out[str(cam)] = "auto"
+        elif isinstance(sc, (list, tuple)) and len(sc) == 2:
+            try:
+                lo, hi = float(sc[0]), float(sc[1])
+            except (TypeError, ValueError):
+                raise AssetError("camera range must be two numbers")
+            if not (-40 <= lo < hi <= 600):
+                raise AssetError("camera range: min must be below max (both between -40 and 600 °C)")
+            out[str(cam)] = [round(lo, 1), round(hi, 1)]
+    return out
+
+
+def _clean_spots(v) -> list[dict]:
+    spots, used = [], set()
+    for s in (v or [])[:MAX_SPOTS] if isinstance(v, list) else []:
+        cam = str(s.get("camera", ""))
+        if not ID_RE.match(cam):
+            continue
+        try:
+            sid = int(s.get("id"))
+        except (TypeError, ValueError):
+            sid = 0
+        if not 1 <= sid <= MAX_SPOTS or (cam, sid) in used:  # give it the lowest free number
+            sid = next(n for n in range(1, MAX_SPOTS + 1) if (cam, n) not in used)
+        used.add((cam, sid))
+        x, y = float(s.get("x", 50)), float(s.get("y", 50))
+        spots.append({
+            "id": sid, "camera": cam,
+            "label": (str(s.get("label") or f"Spot {sid}").strip())[:40],
+            "x": round(min(max(x, 0.0), 100.0), 2),
+            "y": round(min(max(y, 0.0), 100.0), 2),
+        })
+    return spots

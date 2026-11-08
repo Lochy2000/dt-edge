@@ -1,4 +1,4 @@
-// Asset diagram: a simple 2D drawing of the object, with a dot where each probe sits and a
+// Asset diagram: a simple 2D drawing of the object (kettle, fan matrix, generic outline or a photo), with a dot where each probe sits and a
 // readable label (name + live value) joined to it by a line.
 //
 // The SVG is 560 x 340 units and scales to fit its box. Probe positions are stored in % of
@@ -38,6 +38,25 @@ const Diagram = (() => {
       <text class="dg-caption" x="280" y="333" text-anchor="middle">base</text>`;
   }
 
+  // Fan matrix (test rig): a housing with two square fan units side by side, front view.
+  // The blades are in <g class="blades">; they turn slowly while recording (.spin on the <svg>, see style.css).
+  function fan(cx, cy) {
+    const blade = "M0 -9 C 10 -14, 20 -26, 12 -40 C 5 -32, -3 -22, -6 -8 Z";  // one curved blade, from the hub outwards
+    const blades = Array.from({ length: 7 }, (_, k) => `<path d="${blade}" transform="rotate(${(k * 360) / 7})"/>`).join("");
+    return `
+      <rect class="dg-line" x="${cx - 57}" y="${cy - 57}" width="114" height="114" rx="4"/>
+      <circle class="dg-line" cx="${cx}" cy="${cy}" r="47"/>
+      <g transform="translate(${cx} ${cy})"><g class="blades">
+        <circle r="46" class="dg-ghost"/>${blades}<circle r="9" class="dg-hub"/>
+      </g></g>`;
+  }
+  const MATRIX = `
+      <rect class="dg-line" x="148" y="96" width="264" height="150" rx="6"/>
+      ${fan(214, 171)}${fan(346, 171)}
+      <text class="dg-caption" x="214" y="266" text-anchor="middle">fan 1</text>
+      <text class="dg-caption" x="346" y="266" text-anchor="middle">fan 2</text>
+      <text class="dg-caption" x="280" y="88" text-anchor="middle">fan matrix (cooling unit)</text>`;
+
   const GENERIC = `
       <g class="dg-line"><rect x="190" y="60" width="180" height="236" rx="16"/></g>
       <text class="dg-caption" x="280" y="320" text-anchor="middle">object under test</text>`;
@@ -48,6 +67,8 @@ const Diagram = (() => {
       g.innerHTML = `<image href="${esc(imageUrl)}" x="0" y="0" width="${W}" height="${H}" preserveAspectRatio="xMidYMid meet"/>`;
     } else if (kind === "kettle") {
       g.innerHTML = kettle(opts.waterLevel ?? 60);
+    } else if (kind === "matrix") {
+      g.innerHTML = MATRIX;
     } else {
       g.innerHTML = GENERIC;
     }

@@ -45,6 +45,7 @@ class Store:
                 "enabled": enabled,
                 "stale_after": float(cfg.get("stale_after_s", max(self.default_stale_s, 3 * poll))),
                 "scale": cfg.get("scale", "auto"),
+                "scale_cfg": cfg.get("scale", "auto"),   # from sensors.yaml; an asset can override it
                 "smooth": bool(cfg.get("smooth", False)),
                 "last_ok": None,
                 "error": None,
@@ -83,6 +84,31 @@ class Store:
                     listener.on_readings([m for m, _ in msgs])
             except Exception:  # noqa: BLE001 - a recorder problem must not stop the sensor
                 log.exception("listener %s failed", type(listener).__name__)
+
+    def set_scale(self, sensor_id: str, scale=None):
+        """Colour range for a camera: [lo, hi] in degC, "auto", or None = back to sensors.yaml."""
+        with self._lock:
+            s = self._sensors.get(sensor_id)
+            if s is None:
+                return
+            s["scale"] = s["scale_cfg"] if scale is None else scale
+            for entry in s["frames"].values():  # apply now, not just from the next image
+                if s["scale"] != "auto":
+                    entry["lo"], entry["hi"] = float(s["scale"][0]), float(s["scale"][1])
+                elif "frame" in entry:
+                    entry["lo"], entry["hi"] = float(entry["frame"].data.min()), float(entry["frame"].data.max())
+
+    def camera_ids(self) -> list[str]:
+        with self._lock:
+            return [sid for sid, s in self._sensors.items() if s["frames"] or s["type"] in ("lepton", "mlx90640")]
+
+    def drop_points(self, sensor_id: str, prefix: str, keep: set):
+        """Forget points like lepton.spot3 that no longer exist (a camera spot was deleted)."""
+        with self._lock:
+            s = self._sensors.get(sensor_id)
+            if s:
+                for pid in [p for p in s["points"] if p.startswith(prefix) and p not in keep]:
+                    del s["points"][pid]
 
     def set_error(self, sensor_id: str, error: str):
         with self._lock:

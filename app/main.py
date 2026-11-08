@@ -16,6 +16,7 @@ from app.config import ROOT, load_config, load_env
 from app.history import History
 from app.recorder import Recorder
 from app.runner import SensorRunner
+from app.spots import Spots
 from app.store import Store
 from app.web.server import create_app
 
@@ -37,12 +38,14 @@ def main():
     cfg = load_config(args.config)
 
     data_dir = Path(args.data)
-    store = Store(cfg["site"], float(cfg.get("stale_after_s", 5)), history=History(minutes=60))
+    store = Store(cfg["site"], float(cfg.get("stale_after_s", 5)), history=History(minutes=180))  # graphs can show up to 3 h
     assets = Assets(data_dir, ROOT / "assets_default")
-    recorder = Recorder(data_dir, cfg["site"], copy.deepcopy(cfg["sensors"]))
+    recorder = Recorder(data_dir, cfg["site"], copy.deepcopy(cfg["sensors"]), max_hours=12)
     store.listeners.append(recorder)
     calibration = Calibration(data_dir, store, copy.deepcopy(cfg["sensors"]))
     store.listeners.append(calibration)
+    spots = Spots(store, assets)
+    store.listeners.append(spots)
     runners = []
     for s in cfg["sensors"]:
         enabled = s.get("enabled", True)
@@ -62,7 +65,7 @@ def main():
 
     log.info("dashboard on http://%s:%d", args.host, args.port)
     try:
-        create_app(store, assets, recorder, calibration).run(host=args.host, port=args.port, threaded=True, use_reloader=False)
+        create_app(store, assets, recorder, calibration, spots).run(host=args.host, port=args.port, threaded=True, use_reloader=False)
     finally:
         if recorder.status()["recording"]:
             recorder.stop("dashboard shut down")  # closes the files cleanly on Ctrl+C

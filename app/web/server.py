@@ -9,7 +9,8 @@ Pages
 Live data
   GET  /api/state                latest readings + status for every sensor, recording status, active asset
   GET  /api/frame/<id>.png       latest thermal image, coloured (?smooth=0 shows the real pixels)
-  GET  /api/history?points=a,b&minutes=30    recent values for graphs (from RAM)
+  GET  /api/frame/<id>/at?x=&y=  temperature at a point on the image (x, y in % of the image)
+  GET  /api/history?points=a,b&minutes=30    recent values for graphs (from RAM, up to 180 min)
   GET  /api/history?points=a,b&since=<epoch> only values newer than that (for live updates)
 
 Assets (what the readings mean for the object under test)
@@ -51,6 +52,7 @@ from flask import Flask, Response, abort, jsonify, render_template, request, sen
 from app.assets import AssetError
 from app.calibration import CalibrationError
 from app.recorder import RecorderError
+from app.spots import value_at
 
 FRAME_WIDTH = 480  # pixels; images are scaled up to this width
 
@@ -66,8 +68,18 @@ def render_frame(data: np.ndarray, lo: float, hi: float, smooth: bool) -> bytes:
     return buf.tobytes()
 
 
-def create_app(store, assets, recorder, calibration) -> Flask:
+def create_app(store, assets, recorder, calibration, spots=None) -> Flask:
     app = Flask(__name__)
+
+    def asset_changed():
+        """The active asset (or its settings) changed: apply its camera ranges and spots now."""
+        scales = (assets.active() or {}).get("camera_scale", {})
+        for cam in store.camera_ids():
+            store.set_scale(cam, scales.get(cam))  # None = the range in sensors.yaml
+        if spots:
+            spots.refresh()
+
+    asset_changed()
 
     # Mistakes in a request (bad asset id, already recording, ...) come back as
     # {"error": "..."} with status 400, and the dashboard shows the message.
@@ -117,12 +129,24 @@ def create_app(store, assets, recorder, calibration) -> Flask:
         return Response(render_frame(data, lo, hi, smooth), mimetype="image/png",
                         headers={"Cache-Control": "no-store"})
 
+    @app.get("/api/frame/<point_id>/at")
+    def frame_at(point_id):
+        found = store.frame(point_id)
+        if found is None:
+            abort(404)
+        try:
+            x, y = float(request.args["x"]), float(request.args["y"])
+        except (KeyError, ValueError):
+            return jsonify(error="x and y (in % of the image) are needed"), 400
+        value, row, col = value_at(found[0], x, y)
+        return jsonify(value=round(value, 2), row=row, col=col, shape=list(found[0].shape))
+
     @app.get("/api/history")
     def history():
         points = [p for p in request.args.get("points", "").split(",") if p][:30]
         if "since" in request.args:  # live update: just what's new (exclusive of `since`)
             return jsonify(store.history.get(points, float(request.args["since"]) + 0.001))
-        minutes = min(max(float(request.args.get("minutes", 30)), 1), 60)
+        minutes = min(max(float(request.args.get("minutes", 30)), 1), 180)
         return jsonify(store.history.get(points, time.time() - minutes * 60))
 
     # --------------------------------------------------------------- assets
@@ -140,13 +164,16 @@ def create_app(store, assets, recorder, calibration) -> Flask:
         b = body()
         b["id"] = asset_id
         b["image"] = assets.get(asset_id).get("image")  # the picture only changes via upload
-        return jsonify(assets.save(b))
+        saved = assets.save(b)
+        asset_changed()
+        return jsonify(saved)
 
     @app.post("/api/assets/active")
     def set_active_asset():
         if recorder.status()["recording"]:
             raise AssetError("can't change the asset during a recording")
         assets.set_active(str(body().get("id", "")))
+        asset_changed()
         return jsonify(active=assets.active_id())
 
     @app.post("/api/assets/<asset_id>/image")

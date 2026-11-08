@@ -379,3 +379,51 @@ textarea { background: var(--bg); color: var(--text); border: 1px solid var(--li
 .cal-table td, .cal-table th { white-space: nowrap; }
 .cal-table td.warn { color: var(--stale); white-space: normal; min-width: 14rem; }
 .cal-points .panel-head .btn { padding: 0.2857rem 0.7143rem; font-size: 0.8571rem; text-decoration: none; }
+
+/* ---------- 2026-11-09: test rig (camera comparison, colour range, camera spots, fan matrix) ---------- */
+.btn.small { padding: 0.2143rem 0.6rem; font-size: 0.8214rem; }
+
+/* top-left panel: Power & energy (asset panel "power") or Camera comparison ("compare") */
+#p-power.mode-compare .pw-only, #p-power:not(.mode-compare) .cmp-only { display: none; }
+#ch-compare { height: 18rem; }
+.seg { display: inline-flex; border: 1px solid var(--line); border-radius: 0.5rem; overflow: hidden; flex-shrink: 0; }
+.seg button { background: transparent; border: 0; color: var(--dim); font: 600 0.8214rem var(--sans); padding: 0.2857rem 0.6rem; cursor: pointer; white-space: nowrap; }
+.seg button + button { border-left: 1px solid var(--line); }
+.seg button.on { background: var(--panel-2); color: var(--text); }
+.lg i.dash { background: none !important; border-top: 2px dashed currentColor; height: 0; }
+@media (min-width: 1000px) and (min-height: 480px) {
+  .page-overview #ch-compare { flex: 1 1 0; min-height: 0; height: auto; }
+}
+
+/* thermal image overlay: sits exactly over the picture (placed by overview.js), holds spots and the click readout */
+.cam-overlay { position: absolute; cursor: crosshair; touch-action: none; user-select: none; }
+.cam-overlay.editing { outline: 2px dashed #1f6feb; outline-offset: -2px; cursor: copy; }
+.spot { position: absolute; transform: translate(-50%, -50%); pointer-events: auto; }
+.spot i { display: block; width: 0.8rem; height: 0.8rem; border-radius: 50%; border: 2px solid #fff; background: rgba(0,0,0,0.35); box-shadow: 0 0 0 1px #000; }
+.spot.pick i { border-radius: 2px; background: none; width: 0.9rem; height: 0.9rem; border-color: #39c5bb; }
+.spot span {
+  position: absolute; left: 1rem; top: 50%; transform: translateY(-50%); white-space: nowrap;
+  background: rgba(13,17,23,0.85); border: 1px solid var(--line); border-radius: 0.3571rem;
+  padding: 1px 0.4rem; font: 600 0.7857rem var(--mono); color: var(--text); pointer-events: none;
+}
+.spot.left span { left: auto; right: 1rem; }
+.spot span b { color: var(--dim); font: 600 0.7143rem var(--sans); margin-right: 0.3rem; }
+.spot.pick button { position: absolute; top: -1.4rem; left: -0.3rem; background: rgba(13,17,23,0.85); color: var(--dim); border: 1px solid var(--line); border-radius: 50%; width: 1.2rem; height: 1.2rem; font-size: 0.7rem; line-height: 1; cursor: pointer; padding: 0; }
+.cam-overlay.editing .spot { cursor: grab; }
+.spot-bar {
+  position: absolute; left: 0.4rem; right: 0.4rem; bottom: 0.4rem; z-index: 2; display: flex; align-items: center; gap: 0.4rem;
+  background: rgba(13,17,23,0.9); border: 1px solid var(--line); border-radius: 0.5rem; padding: 0.3rem 0.5rem; font-size: 0.7857rem; color: var(--dim);
+}
+.spot-bar span { flex: 1; min-width: 0; }
+.frame-msg { z-index: 3; }
+.range-row .field { flex: 1; margin-bottom: 0.5rem; }
+#range-dialog .check { display: flex; margin-bottom: 0.5rem; }
+
+/* fan matrix drawing: the blades turn slowly while a recording runs */
+.diagram .dg-ghost { fill: none; stroke: none; }
+.diagram .blades path { fill: rgba(154, 165, 180, 0.18); stroke: #9aa5b4; stroke-width: 1.5; stroke-linejoin: round; }
+.diagram .dg-hub { fill: var(--bg); stroke: #9aa5b4; stroke-width: 2; }
+.diagram .blades { transform-box: fill-box; transform-origin: center; }
+.diagram.spin .blades { animation: fan-spin 5s linear infinite; }
+@keyframes fan-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .diagram.spin .blades { animation-duration: 20s; } }

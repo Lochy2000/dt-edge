@@ -5,6 +5,8 @@
     <option value="15">Last 15 minutes</option>
     <option value="30" selected>Last 30 minutes</option>
     <option value="60">Last 60 minutes</option>
+    <option value="120">Last 2 hours</option>
+    <option value="180">Last 3 hours</option>
   </select>
 {% endblock %}
 
@@ -13,21 +15,31 @@
      On a laptop-sized screen or bigger, all four panels fit on one screen (see style.css). -->
 <main class="ov-grid">
 
-  <!-- Power & energy: the asset's "power" and "state" points (the smart plug) -->
+  <!-- Top-left panel, set by the asset's "panel":
+         power   = Power & energy: the asset's "power" and "state" points (the smart plug)
+         compare = Camera comparison: every camera's max & mean, or min against the room air -->
   <section class="panel" id="p-power">
     <div class="panel-head">
-      <h2>Power &amp; energy</h2><span class="pstat" data-for="power"></span>
-      <span class="badge" id="state-now" title="Smart plug">PLUG —</span>
+      <h2 class="pw-only">Power &amp; energy</h2><h2 class="cmp-only">Camera comparison</h2>
+      <span class="pstat" data-for="power"></span>
+      <span class="seg cmp-only" id="cmp-view">
+        <button type="button" data-cmp="max">Max &amp; mean</button><button type="button" data-cmp="min">Min vs room</button>
+      </span>
+      <span class="badge pw-only" id="state-now" title="Smart plug">PLUG —</span>
       <button class="link" data-details="power" type="button">Details ↗</button>
     </div>
-    <div class="tiles">
+    <div class="tiles pw-only">
       <div class="tile"><span class="t-label">Current power</span><b class="t-value" id="power-now">—</b></div>
       <div class="tile"><span class="t-label" id="energy-label">Energy</span><b class="t-value" id="energy-now">—</b></div>
     </div>
-    <div class="chart-title">Electrical power (W)</div>
-    <div class="chart" id="ch-power"></div>
-    <div class="chart-title">Energy, cumulative over the time shown (Wh)</div>
-    <div class="chart" id="ch-energy"></div>
+    <div class="chart-title pw-only">Electrical power (W)</div>
+    <div class="chart pw-only" id="ch-power"></div>
+    <div class="chart-title pw-only">Energy, cumulative over the time shown (Wh)</div>
+    <div class="chart pw-only" id="ch-energy"></div>
+
+    <div class="tiles cmp-only" id="cmp-tiles"></div>
+    <div class="legend cmp-only" id="cmp-legend"></div>
+    <div class="chart cmp-only" id="ch-compare"></div>
   </section>
 
   <!-- Thermal camera: one camera at a time, chosen in the dropdown -->
@@ -35,11 +47,23 @@
     <div class="panel-head">
       <h2>Thermal camera</h2><span class="pstat" data-for="camera"></span>
       <select id="cam-select" title="Camera"></select>
+      <button class="btn small ghost" id="range-btn" type="button" title="Colour range of the image">Range</button>
+      <button class="btn small ghost" id="spots-btn" type="button" title="Fixed points on the image, read and recorded like a probe">Spots</button>
       <button class="icon-btn" id="cam-full" type="button" title="Full screen">⤢</button>
     </div>
     <div class="cam-body">
       <div class="thermal" id="thermal-box">
-        <div class="frame"><img id="cam-img" alt="thermal image"><div class="frame-msg" id="cam-msg" hidden></div></div>
+        <div class="frame">
+          <img id="cam-img" alt="thermal image">
+          <!-- click = temperature at that point; camera spots (cam-overlay is placed over the image itself) -->
+          <div class="cam-overlay" id="cam-overlay" title="Click for the temperature at that point"></div>
+          <div class="spot-bar" id="spot-bar" hidden>
+            <span>Click to add a spot · drag to move · double-click to rename or delete</span>
+            <button class="btn small primary" id="spots-save" type="button">Save</button>
+            <button class="btn small ghost" id="spots-cancel" type="button">Cancel</button>
+          </div>
+          <div class="frame-msg" id="cam-msg" hidden></div>
+        </div>
         <div class="scale"><span class="hi" id="cam-hi">--</span><div class="bar"></div><span class="lo" id="cam-lo">--</span></div>
       </div>
       <div class="cam-stats">
@@ -71,6 +95,7 @@
         <div class="asset-tools">
           <select id="drawing-select" title="Picture the probes sit on">
             <option value="kettle">Kettle drawing</option>
+            <option value="matrix">Fan matrix</option>
             <option value="generic">Generic outline</option>
             <option value="photo">Uploaded photo</option>
             <option value="__upload">Upload new photo…</option>
@@ -95,6 +120,26 @@
     <div class="env-tiles" id="env-tiles"></div>
   </section>
 </main>
+
+<!-- Colour range of the thermal image (saved per asset and camera) -->
+<dialog id="range-dialog">
+  <form method="dialog" class="dlg">
+    <h2>Colour range · <span id="range-cam"></span></h2>
+    <p class="dlg-sub">Fix the colour scale so the image stops re-scaling as the scene changes. This only changes
+      the colours on screen: temperatures, spots and recordings are not affected. Saved with this asset.</p>
+    <label class="check"><input type="radio" name="rmode" value="auto"> Auto: follows the image</label>
+    <label class="check"><input type="radio" name="rmode" value="fixed"> Fixed range</label>
+    <div class="field-row range-row">
+      <label class="field"><span>Min °C</span><input type="number" id="range-lo" step="0.5"></label>
+      <label class="field"><span>Max °C</span><input type="number" id="range-hi" step="0.5"></label>
+    </div>
+    <p class="dlg-note" id="range-now"></p>
+    <div class="dlg-actions">
+      <button class="btn ghost" value="cancel">Cancel</button>
+      <button class="btn primary" id="range-save" value="save">Save</button>
+    </div>
+  </form>
+</dialog>
 
 <!-- "Open details": a bigger graph, stats for the time shown, and a CSV of it -->
 <dialog id="details-dialog" class="wide-dialog">

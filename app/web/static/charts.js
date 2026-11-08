@@ -33,7 +33,7 @@ const Charts = (() => {
     return splits.map(t => new Date(t * 1000).toLocaleTimeString("en-GB", o));
   }
 
-  // series: [{label, color, unit, dp, fill}]   opts: {height (default: fill the box), spark, legend, zero, noXAxis}
+  // series: [{label, color, unit, dp, fill, dash}]  dash: e.g. [6, 4] for a dashed line   opts: {height (default: fill the box), spark, legend, zero, noXAxis}
   //   zero: y axis always starts at 0 (power, energy), so noise isn't magnified into spikes
   // 1rem in px: the overview scales with the screen, so graph text follows it too
   const rem = () => parseFloat(getComputedStyle(document.documentElement).fontSize) || 14;
@@ -77,6 +77,7 @@ const Charts = (() => {
           stroke: s.color,
           width: spark ? 1.5 : Math.max(1.5, 0.14 * r),
           fill: s.fill ? s.color + "22" : undefined,
+          dash: s.dash,
           spanGaps: true,            // sensors that report every 2 s still draw a continuous line
           points: { show: false },
           value: (u, v) => (v == null ? "—" : `${v.toFixed(s.dp ?? 1)} ${s.unit || ""}`),

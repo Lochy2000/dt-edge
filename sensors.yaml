@@ -56,6 +56,7 @@ sensors:
   - id: plug
     type: tapo_p110
     label: Smart plug · Tapo P110
+    enabled: false        # off for the test rig (no plug, no Wi-Fi to reach it); set true for the kettle
     # The plug's IP goes in .env as TAPO_HOST (it changes on a phone hotspot, and .env
     # never clashes with git pull). A host: line here would override it.
     poll_s: 2

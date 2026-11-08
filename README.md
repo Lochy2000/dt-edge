@@ -152,13 +152,13 @@ Warnings flag a patch under ~3 px, a box bigger than the patch, a TC changing > 
 
 | Page | What it's for |
 |---|---|
-| **Overview** | The rig at a glance on one screen, for the object under test: power & energy, one thermal camera, probe temperatures over time with heating rate next to a 2D drawing of the object (kettle / generic / your photo) showing each probe's live reading, and all room-air readings. Each panel has **Details** (big graph, min/max/mean, CSV of the time shown). The page scales with the window, so it fits one screen on a laptop or a big monitor |
+| **Overview** | The rig at a glance on one screen, for the object under test: power & energy (or, on the test rig, a camera comparison), one thermal camera (click it for the temperature at any point), probe temperatures over time with heating rate next to a 2D drawing of the object (kettle / fan matrix / generic / your photo) showing each probe's live reading, and all room-air readings. Each panel has **Details** (big graph, min/max/mean, CSV of the time shown). The page scales with the window, so it fits one screen on a laptop or a big monitor |
 | **Sensors** | Every sensor as a card with its status: the health check when setting up or debugging |
 | **Recorded runs** | Downloads for every recorded test |
 
-The header shows the asset (object under test), **Probes…**, **Record**, a **Live** indicator (amber/red with a count when a sensor needs a look; click it for the Sensors page) and, on Overview, the time range for the graphs (5–60 min, kept in memory on the Pi).
+The header shows the asset (object under test), **Probes…**, **Record**, a **Live** indicator (amber/red with a count when a sensor needs a look; click it for the Sensors page) and, on Overview, the time range for the graphs (5 min to 3 hours, kept in memory on the Pi; recordings keep everything).
 
-**Placing probes on the drawing:** Overview → **Move probes** → drag each dot to where the thermocouple is → **Save positions**. Labels arrange themselves either side of the object; dots, lines and labels use the same colours as the graph lines. Pick **Kettle drawing**, **Generic outline** or **Uploaded photo** in the dropdown under the drawing (**Upload new photo…** is in the same list). With the kettle drawing, the **Water** slider sets how full it is; that's saved with each recording.
+**Placing probes on the drawing:** Overview → **Move probes** → drag each dot to where the thermocouple is → **Save positions**. Labels arrange themselves either side of the object; dots, lines and labels use the same colours as the graph lines. Pick **Kettle drawing**, **Fan matrix**, **Generic outline** or **Uploaded photo** in the dropdown under the drawing (**Upload new photo…** is in the same list). With the kettle drawing, the **Water** slider sets how full it is; that's saved with each recording.
 
 **No hardware / demo fallback:** `./run.sh --config demo.yaml` runs simulated sensors with the same names as the rig (thermocouples, plug switching ~2.9 kW, room air, camera), so the whole dashboard works with nothing plugged in.
 
@@ -178,7 +178,7 @@ The graphs use [uPlot](https://github.com/leeoniya/uPlot) (MIT), stored in `app/
 | Events | Start/stop, your markers, plug on/off |
 | Zip | The whole run folder, including `meta.json` (asset, probe labels and positions, sensor config, summary) and thermal images (`frames/*.npz`, load with `numpy.load`) |
 
-Runs are saved on the Pi in `data/runs/<date-time>_<name>/`. **Delete** on the Recorded runs page removes a run permanently (it asks first; not possible while it's recording). Energy per run is worked out from the plug's power readings (area under the curve), which is much finer than the plug's own whole-Wh counter. A run stops itself after 6 hours, and won't start with less than 500 MB free.
+Runs are saved on the Pi in `data/runs/<date-time>_<name>/`. **Delete** on the Recorded runs page removes a run permanently (it asks first; not possible while it's recording). Energy per run is worked out from the plug's power readings (area under the curve), which is much finer than the plug's own whole-Wh counter. A run stops itself after 12 hours, and won't start with less than 500 MB free.
 
 ## Assets and probes
 
@@ -188,10 +188,20 @@ Runs are saved on the Pi in `data/runs/<date-time>_<name>/`. **Delete** on the R
 - **Thermocouples:** all 8 TC-08 sockets are read (`tc08.ch1` … `tc08.ch8`), plus `tc08.cold_junction`, the logger's own temperature. Tick the sockets you're using in **Probes…** and name them; unticked ones are dimmed on the Sensors page and left off the Overview.
 - **The TC-08 cannot detect an unplugged probe.** An empty socket reads about the logger's own (cold junction) temperature, so it looks like a probe at room temperature. **Probes…** shows the logger temperature and marks sockets reading within 0.3 °C of it ("≈ logger"). If unsure which probe is in which socket, hold one tip in your fingers and watch which value rises.
 - **Probe tips must not touch the water or other conductive parts of a powered appliance.** On this rig a probe in the kettle water caused jumps on all channels (the TC-08 is pushed out of its input range by the voltage difference), and it's an electrical safety risk. Use insulated (ungrounded-junction) probes if a reading in the water is needed.
-- Profiles are kept in `data/assets/*.json`. `data/` isn't in Git, so dashboard edits never clash with `git pull`. The example in `assets_default/` is copied in on first start.
+- Profiles are kept in `data/assets/*.json`. `data/` isn't in Git, so dashboard edits never clash with `git pull`. The built-in profiles in `assets_default/` (Kettle, Test rig) are copied in when missing, so a new one appears after `git pull` + restart; existing profiles are never overwritten.
 - Each probe also has a position on a picture of the object (x, y in %), set by dragging the dots on the Overview.
 
 The asset can't be changed during a recording: the run saves the probe labels it started with.
+
+## Test rig profile (fan matrix in the climate container)
+
+Pick **Test rig** in the asset dropdown. Compared with the kettle:
+
+- **Camera comparison** replaces Power & energy: every enabled camera's **max & mean** (mean dashed), or **min vs room air**, with the gap between the first two cameras in the tiles. The MLX90640 is much less accurate than the Lepton, so this is for comparing trends, not absolute values. The panel is set by `"panel": "compare"` in the profile (`"power"` = the plug panel).
+- **Fan matrix drawing**: drag thermocouple dots onto the two fans (**Probes…** to add up to 8, **Move probes** to place them). The fans turn slowly while a recording runs (decoration only: nothing measures the real fans).
+- **Range** (thermal panel): **Auto** or a **fixed** min/max in °C, so the colours stop re-scaling as the scene changes. Saved per profile and per camera. Only the colours change; temperatures and recordings don't.
+- **Click the thermal image** for the temperature at that point (mean of 3 x 3 pixels on the Lepton, one pixel on the MLX). It updates every second; ✕ removes it.
+- **Spots** (thermal panel): fixed points on the image that behave like extra thermocouples. **Spots** → click to add, drag to move, double-click to rename or delete → **Save**. They appear dashed in Thermal response and are **recorded** as `lepton.spot1`, `lepton.spot2`… (labelled with their names in the CSVs). Up to 8 per profile. Spot readings carry the camera's error (distance, emissivity): they are not corrected by the Calibrate page.
 
 ## Not built yet (deliberately)
 

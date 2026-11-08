@@ -1,5 +1,15 @@
 # Changelog
 
+## 2026-11-08 — Test rig profile (fan matrix test)
+- **Test rig** profile (`assets_default/test-rig.json`), picked in the asset dropdown next to Kettle. Built-in profiles missing from `data/assets/` are now copied in at start-up (before, only when there were no profiles at all), so it appears after `git pull`. The kettle is unchanged.
+- **Camera comparison panel** (asset `"panel": "compare"`) replaces Power & energy: max & mean per camera, or min vs room air; tiles show the gap between the first two cameras. Details ↗ works for it.
+- **Fan matrix drawing** (`drawing: "matrix"`) with up to 8 draggable thermocouple dots; the fans turn slowly while recording.
+- **Colour range** on the thermal panel: Auto or fixed min/max, saved per asset and camera (`camera_scale`), applied immediately (`Store.set_scale`). Display only.
+- **Click the thermal image** for the temperature under the pointer (`GET /api/frame/<id>/at?x=&y=`, % of the image; 3 x 3 pixel mean on the Lepton).
+- **Camera spots** (`app/spots.py`, asset `spots`): fixed points on a thermal image, read every frame and fed to the store as `<camera>.spot<n>`, so they show in Thermal response (dashed), `/api/state` and recordings. Edit with **Spots** on the thermal panel.
+- Graphs can show **2 h / 3 h** (history kept for 180 min); recordings auto-stop after **12 h** (was 6).
+- `demo.yaml`: second simulated camera (`mlx`) so the comparison works without hardware. `sensors.yaml`: smart plug disabled for the test rig (set `enabled: true` for the kettle).
+
 ## 2026-11-08 — Calibrate tab (thermal camera vs thermocouple, step 1)
 - **New Calibrate page** (`/calibrate`, `calibration.py`, `calibrate.js`): pick a session (camera + reference TC + tape patch size), enter the distance, click the patch on the live image (real pixels), see TC vs box mean/max, background ring, error and loss live; **Capture point** averages N s and saves it. Points table, delete, CSV export. Measures only; live readings are not corrected.
 - Each point stores the averaged camera image (`data/calibration/<session>/p001.npy`) so the box can be re-picked later.

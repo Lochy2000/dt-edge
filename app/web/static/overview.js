@@ -3,9 +3,11 @@
 //   every 1 s  GET /api/state    -> latest values, sensor status, recording, asset
 //   every 2 s  GET /api/history  -> new points for the graphs (the first load gets the whole time range)
 //
-// Which sensors each panel shows comes from the asset profile: power/state (plug), probes
-// (thermocouples), ambient (room air: every reading of those sensors is shown), thermal
-// (default camera), drawing (kettle / generic / photo).
+// Which sensors each panel shows comes from the asset profile: panel (top left: "power" = the
+// smart plug's power/state, "compare" = every camera's max/mean or min vs room air), probes
+// (thermocouples), spots (fixed points on a thermal image, shown dashed next to the probes),
+// ambient (room air: every reading of those sensors is shown), thermal (default camera),
+// camera_scale (fixed colour range per camera), drawing (kettle / matrix / generic / photo).
 
 window.PAGE_POLLS = true; // tells controls.js this page fetches the state itself
 
@@ -31,6 +33,8 @@ window.PAGE_POLLS = true; // tells controls.js this page fetches the state itsel
     return wh >= 1000 ? `${(wh / 1000).toFixed(2)}<small>kWh</small>` : `${wh.toFixed(1)}<small>Wh</small>`;
   }
   const ENV_COLORS = ["#58a6ff", "#3fb950", "#e3b341", "#a371f7"];
+  const CAM_COLORS = ["#f0883e", "#58a6ff", "#db61a2"];   // camera comparison: one colour per camera
+  const ROOM_COLOR = "#3fb950";
 
   // ------------------------------------------------------------------ state
   let state = null;         // latest /api/state
@@ -48,6 +52,8 @@ window.PAGE_POLLS = true; // tells controls.js this page fetches the state itsel
   let dragIndex = null;
   let camId = null;         // frame point shown, e.g. "lepton.image"
   let detailsKind = null, detailsChart = null;
+  let cmpView = store.get("dt.cmp") === "min" ? "min" : "max";  // camera comparison: "max" (max & mean) or "min" (min vs room)
+  let cmpSig = "";          // to notice when the compared series change
 
   const sensorOf = (pid) => sensors[String(pid).split(".")[0]];
   const probeColor = (i) => Charts.PALETTE[i % Charts.PALETTE.length];
@@ -64,8 +70,40 @@ window.PAGE_POLLS = true; // tells controls.js this page fetches the state itsel
     }
     return out;
   }
+  // Camera spots (asset.spots): point id <camera>.spot<id>, e.g. lepton.spot1
+  const spotList = () => (asset ? asset.spots || [] : []);
+  const spotPid = (s) => `${s.camera}.spot${s.id}`;
+  // Thermal response graph: the probes (solid), then the camera spots (dashed)
+  function tempSeries() {
+    if (!asset) return [];
+    return [
+      ...asset.probes.map((p, i) => ({ pid: p.point, label: p.label, color: probeColor(i) })),
+      ...spotList().map((s, j) => ({ pid: spotPid(s), label: `${s.label} (camera)`, color: probeColor(asset.probes.length + j), dash: [6, 4] })),
+    ];
+  }
+
+  // Camera comparison (asset.panel == "compare")
+  const isCompare = () => !!(asset && asset.panel === "compare");
+  const camSensors = () => (state ? state.sensors.filter(s => s.status !== "OFF" && (s.frames.length || s.type === "lepton" || s.type === "mlx90640")) : []);
+  const shortName = (s) => (String(s.label).split("·").pop() || s.label).trim();
+  function compareSeries() {
+    if (!isCompare()) return [];
+    const out = [];
+    camSensors().forEach((s, i) => {
+      const color = CAM_COLORS[i % CAM_COLORS.length];
+      if (cmpView === "max") {
+        out.push({ pid: `${s.id}.max`, label: `${shortName(s)} max`, color });
+        out.push({ pid: `${s.id}.mean`, label: `${shortName(s)} mean`, color, dash: [6, 4] });
+      } else {
+        out.push({ pid: `${s.id}.min`, label: `${shortName(s)} min`, color });
+      }
+    });
+    if (cmpView === "min" && asset.ambient[0]) out.push({ pid: asset.ambient[0], label: "Room air", color: ROOM_COLOR });
+    return out;
+  }
+
   const keys = () => (asset
-    ? [...new Set([asset.power, asset.state, ...asset.probes.map(p => p.point), ...envPoints()].filter(Boolean))]
+    ? [...new Set([asset.power, asset.state, ...tempSeries().map(t => t.pid), ...compareSeries().map(c => c.pid), ...envPoints()].filter(Boolean))]
     : []);
 
   // --------------------------------------------------------------- polling
@@ -136,12 +174,18 @@ window.PAGE_POLLS = true; // tells controls.js this page fetches the state itsel
 
     charts.power = Charts.lineChart($("#ch-power"), [{ label: "Power", color: "#58a6ff", unit: "W", dp: 0, fill: true }], { zero: true, noXAxis: true });
     charts.energy = Charts.lineChart($("#ch-energy"), [{ label: "Energy", color: "#a371f7", unit: "Wh", dp: 1 }], { zero: true });
-    charts.temps = Charts.lineChart($("#ch-temps"),
-      asset.probes.map((p, i) => ({ label: p.label, color: probeColor(i), unit: "°C" })));
+    const ts = tempSeries();
+    charts.temps = Charts.lineChart($("#ch-temps"), ts.map(t => ({ label: t.label, color: t.color, unit: "°C", dash: t.dash })));
 
-    $("#temps-legend").innerHTML = asset.probes.length
-      ? asset.probes.map((p, i) => `<span class="lg"><i style="background:${probeColor(i)}"></i>${esc(p.label)} <b data-lg="${esc(p.point)}">—</b></span>`).join("")
-      : `<span class="dim small">No probes on this asset yet. Use <b>Probes…</b> to add them.</span>`;
+    $("#temps-legend").innerHTML = ts.length
+      ? ts.map(t => `<span class="lg"><i class="${t.dash ? "dash" : ""}" style="background:${t.color};color:${t.color}"></i>${esc(t.label)} <b data-lg="${esc(t.pid)}">—</b></span>`).join("")
+      : `<span class="dim small">No probes on this asset yet. Use <b>Probes…</b> to add thermocouples, or <b>Spots</b> on the thermal image.</span>`;
+
+    $("#p-power").classList.toggle("mode-compare", isCompare());
+    cmpSig = "";
+    ensureCompareChart();
+    endSpotEdit(false);
+    pick = null;
 
     syncWaterControl();
     const sel = $("#drawing-select");
@@ -165,6 +209,49 @@ window.PAGE_POLLS = true; // tells controls.js this page fetches the state itsel
     });
   }
 
+  // Camera comparison chart: rebuilt when the compared series change (view toggle, a camera turned on)
+  function ensureCompareChart() {
+    if (!isCompare()) return;
+    const cs = compareSeries();
+    const sig = `${cmpView}|${cs.map(c => c.pid).join(",")}`;
+    if (sig === cmpSig) return;
+    cmpSig = sig;
+    if (charts.compare) charts.compare.destroy();
+    $("#ch-compare").innerHTML = "";
+    charts.compare = Charts.lineChart($("#ch-compare"), cs.map(c => ({ label: c.label, color: c.color, unit: "°C", dash: c.dash })));
+    $("#cmp-legend").innerHTML = cs.length
+      ? cs.map(c => `<span class="lg"><i class="${c.dash ? "dash" : ""}" style="background:${c.color};color:${c.color}"></i>${esc(c.label)} <b data-lg="${esc(c.pid)}">—</b></span>`).join("")
+      : `<span class="dim small">No thermal cameras enabled in sensors.yaml.</span>`;
+    for (const b of document.querySelectorAll("#cmp-view [data-cmp]")) b.classList.toggle("on", b.dataset.cmp === cmpView);
+    loadHistory(true);
+  }
+  for (const b of document.querySelectorAll("#cmp-view [data-cmp]")) {
+    b.onclick = () => { cmpView = b.dataset.cmp; store.set("dt.cmp", cmpView); ensureCompareChart(); renderLive(); };
+  }
+
+  // tiles above the comparison graph: the gap between the first two cameras (or camera vs room)
+  function renderCompareTiles() {
+    const cams = camSensors();
+    const val = (pid) => { const p = points[pid]; return p && typeof p.value === "number" ? p.value : null; };
+    const diff = (a, b) => (a == null || b == null ? "—" : `${a - b >= 0 ? "+" : ""}${(a - b).toFixed(1)}<small>°C</small>`);
+    let tiles = [];
+    if (cmpView === "max") {
+      if (cams.length >= 2) {
+        const [a, b] = cams;
+        tiles = [[`Max gap · ${shortName(a)} − ${shortName(b)}`, diff(val(`${a.id}.max`), val(`${b.id}.max`))],
+                 [`Mean gap · ${shortName(a)} − ${shortName(b)}`, diff(val(`${a.id}.mean`), val(`${b.id}.mean`))]];
+      } else if (cams.length === 1) {
+        const a = cams[0];
+        tiles = [[`${shortName(a)} max`, val(`${a.id}.max`) == null ? "—" : fmt(val(`${a.id}.max`), "DEG_C")],
+                 [`${shortName(a)} mean`, val(`${a.id}.mean`) == null ? "—" : fmt(val(`${a.id}.mean`), "DEG_C")]];
+      }
+    } else {
+      const room = asset.ambient[0] ? val(asset.ambient[0]) : null;
+      tiles = cams.slice(0, 2).map(c => [`${shortName(c)} min − room air`, diff(val(`${c.id}.min`), room)]);
+    }
+    $("#cmp-tiles").innerHTML = tiles.map(([l, v]) => `<div class="tile"><span class="t-label">${esc(l)}</span><b class="t-value">${v}</b></div>`).join("");
+  }
+
   // ------------------------------------------------------------- charts
   function redrawCharts() {
     if (!asset || !charts.power) return;
@@ -175,12 +262,13 @@ window.PAGE_POLLS = true; // tells controls.js this page fetches the state itsel
       charts.energy.setData([xs, e]);
       lastEnergyWh = e.length ? e[e.length - 1] : null;
     }
-    charts.temps.setData(Charts.align(hist, asset.probes.map(p => p.point)));
+    charts.temps.setData(Charts.align(hist, tempSeries().map(t => t.pid)));
+    if (charts.compare) charts.compare.setData(Charts.align(hist, compareSeries().map(c => c.pid)));
     envPoints().forEach((pid, i) => charts[`spark${i}`]?.setData(Charts.align(hist, [pid])));
 
-    // heating rate of the first probe (the main one)
-    const main = asset.probes[0];
-    const h = main && hist[main.point];
+    // heating rate of the first probe (the main one), or the first camera spot if there are no probes
+    const main = tempSeries()[0];
+    const h = main && hist[main.pid];
     const rate = h ? Charts.ratePerMin(h.t, h.v) : null;
     $("#rate-label").textContent = main ? `${rate != null && rate < 0 ? "Cooling" : "Heating"} rate · ${main.label}` : "Heating rate";
     $("#rate-now").innerHTML = rate == null ? "—" : `${rate > 0 ? "+" : ""}${rate.toFixed(2)}<small>°C/min</small>`;
@@ -213,8 +301,16 @@ window.PAGE_POLLS = true; // tells controls.js this page fetches the state itsel
         $("#energy-label").textContent = `Energy, last ${rangeMin} min`;
         $("#energy-now").innerHTML = fmtWh(lastEnergyWh);
       }
-      panelStatus("power", [asset.power, asset.state]);
-      panelStatus("probes", asset.probes.map(p => p.point));
+      if (isCompare()) {
+        ensureCompareChart();
+        renderCompareTiles();
+        panelStatus("power", compareSeries().map(c => c.pid));
+      } else {
+        panelStatus("power", [asset.power, asset.state]);
+      }
+      panelStatus("probes", tempSeries().map(t => t.pid));
+      // fan matrix drawing: the fans turn while a recording runs
+      svg.classList.toggle("spin", !!(rec.recording && asset.drawing === "matrix"));
       panelStatus("ambient", envPoints());
 
       for (const el of document.querySelectorAll("[data-lg]")) {
@@ -257,6 +353,9 @@ window.PAGE_POLLS = true; // tells controls.js this page fetches the state itsel
       const p = sensor && points[`${sensor.id}.${m}`];
       $(`#cam-${m}`).innerHTML = p ? fmt(p.value, p.unit) : "—";
     }
+    updateRangeBtn();
+    if (!spotDraft) renderSpots();
+    if (pick) updatePick();
     const msg = $("#cam-msg");
     msg.hidden = !!(sensor && sensor.status === "LIVE");
     msg.textContent = !sensor ? "No camera connected" : sensor.status === "ERROR" ? (sensor.error || "Camera error") : sensor.status;
@@ -273,9 +372,186 @@ window.PAGE_POLLS = true; // tells controls.js this page fetches the state itsel
     if (!camId) { setTimeout(nextFrame, 1000); return; }
     img.src = `/api/frame/${encodeURIComponent(camId)}.png?t=${Date.now()}`;
   }
-  img.onload = () => setTimeout(nextFrame, 250);   // next frame only after this one arrived
+  img.onload = () => { placeOverlay(); setTimeout(nextFrame, 250); };   // next frame only after this one arrived
   img.onerror = () => setTimeout(nextFrame, 1500);
-  $("#cam-select").onchange = (e) => { store.set("dt.cam", e.target.value); setCamera(e.target.value); };
+  $("#cam-select").onchange = (e) => {
+    store.set("dt.cam", e.target.value);
+    endSpotEdit(false);
+    pick = null;
+    setCamera(e.target.value);
+    renderSpots();
+  };
+
+  // ---------------------------------- thermal image overlay: click readout + camera spots
+  // The overlay is placed exactly over the picture (the image is letterboxed in full screen), so
+  // positions are simply % of the overlay = % of the image, whatever the camera's resolution.
+  const overlay = $("#cam-overlay");
+  const frameEl = overlay.parentElement;
+  let pick = null;          // click readout: {x, y, value} (% of the image)
+  let spotDraft = null;     // the shown camera's spots while "Spots" editing is on
+  let spotDrag = null, spotMoved = false, downOnSpot = false;
+  const camSensorId = () => (camId ? camId.split(".")[0] : null);
+  const clampPct = (v) => Math.min(Math.max(v, 0), 100);
+  const pctOf = (e) => {
+    const r = overlay.getBoundingClientRect();
+    return { x: clampPct(((e.clientX - r.left) / r.width) * 100), y: clampPct(((e.clientY - r.top) / r.height) * 100) };
+  };
+
+  function placeOverlay() {
+    const nw = img.naturalWidth, nh = img.naturalHeight, fw = frameEl.clientWidth, fh = frameEl.clientHeight;
+    if (!nw || !nh || !fw || !fh) { overlay.style.display = "none"; return; }
+    const k = Math.min(fw / nw, fh / nh), w = nw * k, h = nh * k;
+    Object.assign(overlay.style, { display: "", left: `${(fw - w) / 2}px`, top: `${(fh - h) / 2}px`, width: `${w}px`, height: `${h}px` });
+  }
+
+  function renderSpots() {
+    placeOverlay();
+    const cam = camSensorId();
+    const list = spotDraft || spotList().filter(s => s.camera === cam);
+    const html = list.map((s, i) => {
+      const p = points[spotPid(s)];
+      const val = spotDraft ? "" : (p ? fmt(p.value, p.unit, false) : "—");
+      return `<div class="spot${s.x > 62 ? " left" : ""}" data-i="${i}" style="left:${s.x}%;top:${s.y}%"><i></i><span><b>${esc(s.label)}</b>${esc(val)}</span></div>`;
+    });
+    if (pick && !spotDraft) {
+      const v = pick.value == null ? "…" : `${pick.value.toFixed(1)} °C`;
+      html.push(`<div class="spot pick${pick.x > 62 ? " left" : ""}" style="left:${pick.x}%;top:${pick.y}%"><i></i><span>${esc(v)}</span><button type="button" data-unpick title="Remove">✕</button></div>`);
+    }
+    overlay.innerHTML = html.join("");
+  }
+
+  // click readout: asks the Pi for the temperature under the point (3 x 3 pixel mean on the Lepton), every second
+  async function updatePick() {
+    if (!pick || !camId) return;
+    const want = pick;
+    try {
+      const r = await api("GET", `/api/frame/${encodeURIComponent(camId)}/at?x=${want.x.toFixed(2)}&y=${want.y.toFixed(2)}`);
+      if (pick === want) pick.value = r.value;
+    } catch { if (pick === want) pick.value = null; }
+    if (!spotDraft) renderSpots();
+  }
+
+  overlay.addEventListener("pointerdown", (e) => {
+    downOnSpot = !!e.target.closest(".spot");
+    if (!spotDraft || !downOnSpot) return;
+    e.preventDefault();
+    spotDrag = Number(e.target.closest(".spot").dataset.i);
+    spotMoved = false;
+    overlay.setPointerCapture(e.pointerId);
+  });
+  overlay.addEventListener("pointermove", (e) => {
+    if (spotDrag === null) return;
+    Object.assign(spotDraft[spotDrag], pctOf(e));
+    spotMoved = true;
+    renderSpots();
+  });
+  const endSpotDrag = () => { spotDrag = null; };
+  overlay.addEventListener("pointerup", endSpotDrag);
+  overlay.addEventListener("pointercancel", endSpotDrag);
+
+  overlay.addEventListener("click", (e) => {
+    if (e.target.closest("[data-unpick]")) { pick = null; renderSpots(); return; }
+    const onSpot = downOnSpot;
+    downOnSpot = false;
+    if (spotDraft) {                       // editing: click on empty image = new spot
+      if (onSpot || spotMoved) { spotMoved = false; return; }
+      const cam = camSensorId();
+      if (spotList().filter(s => s.camera !== cam).length + spotDraft.length >= 8) return toast("Up to 8 spots per asset", true);
+      const used = new Set(spotDraft.map(s => s.id));
+      const id = [1, 2, 3, 4, 5, 6, 7, 8].find(n => !used.has(n));
+      spotDraft.push({ id, camera: cam, label: `Spot ${id}`, ...pctOf(e) });
+      renderSpots();
+      return;
+    }
+    if (onSpot && !e.target.closest(".pick")) return;   // clicking a saved spot does nothing
+    pick = { ...pctOf(e), value: null };
+    renderSpots();
+    updatePick();
+  });
+  overlay.addEventListener("dblclick", (e) => {
+    if (!spotDraft) return;
+    const el = e.target.closest(".spot");
+    if (!el) return;
+    const i = Number(el.dataset.i);
+    const name = prompt("Spot name (leave empty to delete this spot):", spotDraft[i].label);
+    if (name === null) return;
+    if (!name.trim()) spotDraft.splice(i, 1);
+    else spotDraft[i].label = name.trim().slice(0, 40);
+    renderSpots();
+  });
+
+  $("#spots-btn").onclick = () => {
+    if (!asset || !camId) return toast("No camera to put spots on", true);
+    if (state.recording && state.recording.recording) return toast("Can't change spots during a recording", true);
+    if (spotDraft) return;
+    spotDraft = spotList().filter(s => s.camera === camSensorId()).map(s => ({ ...s }));
+    pick = null;
+    overlay.classList.add("editing");
+    $("#spot-bar").hidden = false;
+    renderSpots();
+  };
+  function endSpotEdit(redraw = true) {
+    spotDraft = null;
+    spotDrag = null;
+    overlay.classList.remove("editing");
+    $("#spot-bar").hidden = true;
+    if (redraw) renderSpots();
+  }
+  $("#spots-cancel").onclick = () => endSpotEdit();
+  $("#spots-save").onclick = async () => {
+    const cam = camSensorId();
+    const mine = spotDraft.map(s => ({ ...s, x: Math.round(s.x * 10) / 10, y: Math.round(s.y * 10) / 10 }));
+    const spots = [...spotList().filter(s => s.camera !== cam), ...mine];
+    try {
+      await api("PUT", `/api/assets/${encodeURIComponent(asset.id)}`, { ...asset, spots });
+      endSpotEdit();
+      toast(mine.length ? `Spots saved: shown in Thermal response and recorded as ${cam}.spot1, ${cam}.spot2…` : "Spots removed");
+    } catch (err) { toast(err.message, true); }
+  };
+  window.addEventListener("resize", placeOverlay);
+  document.addEventListener("fullscreenchange", () => setTimeout(placeOverlay, 50));
+
+  // ---------------------------------------------- colour range of the image (per asset and camera)
+  const camScale = () => { const sid = camSensorId(); return asset && sid ? (asset.camera_scale || {})[sid] : undefined; };
+  function updateRangeBtn() {
+    const sc = camScale();
+    $("#range-btn").textContent = Array.isArray(sc) ? `Range ${sc[0]}–${sc[1]} °C` : "Range: auto";
+  }
+  const rangeMode = () => (document.querySelector('input[name="rmode"]:checked') || {}).value;
+  function syncRangeInputs() { const fixed = rangeMode() === "fixed"; $("#range-lo").disabled = !fixed; $("#range-hi").disabled = !fixed; }
+  for (const r of document.querySelectorAll('input[name="rmode"]')) r.onchange = syncRangeInputs;
+  $("#range-btn").onclick = () => {
+    if (!asset || !camId) return toast("No camera", true);
+    const sensor = sensorOf(camId);
+    const sc = camScale();
+    const mn = sensor && points[`${sensor.id}.min`], mx = sensor && points[`${sensor.id}.max`];
+    const lo = Array.isArray(sc) ? sc[0] : (mn ? Math.floor(mn.value) : 0);
+    const hi = Array.isArray(sc) ? sc[1] : (mx ? Math.ceil(mx.value) : 35);
+    $("#range-cam").textContent = sensor ? sensor.label : camId;
+    document.querySelector(`input[name="rmode"][value="${Array.isArray(sc) ? "fixed" : "auto"}"]`).checked = true;
+    $("#range-lo").value = lo;
+    $("#range-hi").value = hi;
+    $("#range-now").innerHTML = mn && mx
+      ? `Image right now: min <b>${Number(mn.value).toFixed(1)} °C</b>, max <b>${Number(mx.value).toFixed(1)} °C</b>. Anything outside a fixed range shows as the end colour.`
+      : "No image from this camera yet.";
+    syncRangeInputs();
+    $("#range-dialog").showModal();
+  };
+  $("#range-save").onclick = async (e) => {
+    e.preventDefault();
+    const sid = camSensorId();
+    let value = "auto";
+    if (rangeMode() === "fixed") {
+      const lo = parseFloat($("#range-lo").value), hi = parseFloat($("#range-hi").value);
+      if (!Number.isFinite(lo) || !Number.isFinite(hi) || lo >= hi) return toast("Min must be a number below max", true);
+      value = [lo, hi];
+    }
+    try {
+      await api("PUT", `/api/assets/${encodeURIComponent(asset.id)}`, { ...asset, camera_scale: { ...(asset.camera_scale || {}), [sid]: value } });
+      $("#range-dialog").close();
+      toast(value === "auto" ? "Colour range: auto" : `Colour range fixed at ${value[0]}–${value[1]} °C`);
+    } catch (err) { toast(err.message, true); }
+  };
   $("#cam-full").onclick = () => { const el = $("#thermal-box"); (el.requestFullscreen || el.webkitRequestFullscreen)?.call(el); };
 
   // ------------------------------------------------ asset drawing + probe dots
@@ -389,11 +665,19 @@ window.PAGE_POLLS = true; // tells controls.js this page fetches the state itsel
 
   // ---------------------------------------------------------- details dialog
   function detailsConfig(kind) {
+    if (kind === "power" && isCompare()) {
+      const cs = compareSeries();
+      return { title: "Camera comparison", keys: cs.map(c => c.pid), colors: cs.map(c => c.color), dashes: cs.map(c => c.dash) };
+    }
     if (kind === "power") return { title: "Power & energy", keys: asset.power ? [asset.power] : [], colors: ["#58a6ff"] };
-    if (kind === "response") return { title: "Thermal response", keys: asset.probes.map(p => p.point), colors: asset.probes.map((_, i) => probeColor(i)) };
+    if (kind === "response") {
+      const ts = tempSeries();
+      return { title: "Thermal response", keys: ts.map(t => t.pid), colors: ts.map(t => t.color), dashes: ts.map(t => t.dash) };
+    }
     return { title: "Environment", keys: envPoints(), colors: ENV_COLORS };
   }
-  const labelOf = (pid) => (asset.probes.find(p => p.point === pid) || {}).label || (points[pid] || {}).label || pid;
+  const labelOf = (pid) => (asset.probes.find(p => p.point === pid) || {}).label
+    || ((tempSeries().concat(compareSeries())).find(t => t.pid === pid) || {}).label || (points[pid] || {}).label || pid;
   const unitOf = (pid) => (points[pid] || {}).unit;
 
   function openDetails(kind) {
@@ -406,8 +690,8 @@ window.PAGE_POLLS = true; // tells controls.js this page fetches the state itsel
     $("#details-chart").innerHTML = "";
     detailsChart = Charts.lineChart($("#details-chart"), cfg.keys.map((pid, i) => {
       const [u, dp] = UNITS[unitOf(pid)] || ["", 1];
-      return { label: labelOf(pid), color: cfg.colors[i % cfg.colors.length], unit: u, dp };
-    }), { height: 360, legend: true, zero: kind === "power" });
+      return { label: labelOf(pid), color: cfg.colors[i % cfg.colors.length], unit: u, dp, dash: (cfg.dashes || [])[i] };
+    }), { height: 360, legend: true, zero: kind === "power" && !isCompare() });
     updateDetails();
   }
 
@@ -425,7 +709,7 @@ window.PAGE_POLLS = true; // tells controls.js this page fetches the state itsel
         <td>${stat(a => Math.min(...a))}</td><td>${stat(a => Math.max(...a))}</td>
         <td>${stat(a => a.reduce((s, v) => s + v, 0) / a.length)}</td><td class="mono dim">${esc(pid)}</td></tr>`;
     });
-    if (detailsKind === "power") rows.push(`<tr><td>Energy over the time shown</td><td colspan="5">${lastEnergyWh == null ? "—" : lastEnergyWh.toFixed(1) + " Wh"}</td></tr>`);
+    if (detailsKind === "power" && !isCompare()) rows.push(`<tr><td>Energy over the time shown</td><td colspan="5">${lastEnergyWh == null ? "—" : lastEnergyWh.toFixed(1) + " Wh"}</td></tr>`);
     $("#details-stats").innerHTML = rows.join("") || `<tr><td colspan="6" class="dim">No sensors set for this panel.</td></tr>`;
   }
 
