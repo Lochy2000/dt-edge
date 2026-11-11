@@ -408,13 +408,16 @@ textarea { background: var(--bg); color: var(--text); border: 1px solid var(--li
 }
 .spot.left span { left: auto; right: 1rem; }
 .spot span b { color: var(--dim); font: 600 0.7143rem var(--sans); margin-right: 0.3rem; }
-.spot.pick button { position: absolute; top: -1.4rem; left: -0.3rem; background: rgba(13,17,23,0.85); color: var(--dim); border: 1px solid var(--line); border-radius: 50%; width: 1.2rem; height: 1.2rem; font-size: 0.7rem; line-height: 1; cursor: pointer; padding: 0; }
+.spot button { position: absolute; top: -1.5rem; left: -0.35rem; background: rgba(13,17,23,0.85); color: var(--dim); border: 1px solid var(--line); border-radius: 50%; width: 1.4rem; height: 1.4rem; font-size: 0.75rem; line-height: 1; cursor: pointer; padding: 0; }
+.spot button:hover { color: #fff; border-color: #f85149; background: #b62324; }
+.spot.sel i { border-color: #58a6ff; box-shadow: 0 0 0 2px #1f6feb; }
 .cam-overlay.editing .spot { cursor: grab; }
 .spot-bar {
   position: absolute; left: 0.4rem; right: 0.4rem; bottom: 0.4rem; z-index: 2; display: flex; align-items: center; gap: 0.4rem;
   background: rgba(13,17,23,0.9); border: 1px solid var(--line); border-radius: 0.5rem; padding: 0.3rem 0.5rem; font-size: 0.7857rem; color: var(--dim);
 }
-.spot-bar span { flex: 1; min-width: 0; }
+.spot-bar span, .spot-bar input { flex: 1; min-width: 0; }
+.spot-bar input { background: var(--bg); color: var(--text); border: 1px solid var(--line); border-radius: 0.3571rem; padding: 0.2rem 0.4rem; font: inherit; }
 .frame-msg { z-index: 3; }
 .range-row .field { flex: 1; margin-bottom: 0.5rem; }
 #range-dialog .check { display: flex; margin-bottom: 0.5rem; }

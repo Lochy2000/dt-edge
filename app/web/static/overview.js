@@ -390,6 +390,7 @@ window.PAGE_POLLS = true; // tells controls.js this page fetches the state itsel
   let pick = null;          // click readout: {x, y, value} (% of the image)
   let spotDraft = null;     // the shown camera's spots while "Spots" editing is on
   let spotDrag = null, spotMoved = false, downOnSpot = false;
+  let spotSel = null, skipClick = false, dragFrom = null;   // selected spot (index in spotDraft) while editing
   const camSensorId = () => (camId ? camId.split(".")[0] : null);
   const clampPct = (v) => Math.min(Math.max(v, 0), 100);
   const pctOf = (e) => {
@@ -411,7 +412,8 @@ window.PAGE_POLLS = true; // tells controls.js this page fetches the state itsel
     const html = list.map((s, i) => {
       const p = points[spotPid(s)];
       const val = spotDraft ? "" : (p ? fmt(p.value, p.unit, false) : "—");
-      return `<div class="spot${s.x > 62 ? " left" : ""}" data-i="${i}" style="left:${s.x}%;top:${s.y}%"><i></i><span><b>${esc(s.label)}</b>${esc(val)}</span></div>`;
+      const del = spotDraft ? `<button type="button" data-del="${i}" title="Delete this spot">✕</button>` : "";   // editing: ✕ above every spot
+      return `<div class="spot${s.x > 62 ? " left" : ""}${spotDraft && i === spotSel ? " sel" : ""}" data-i="${i}" style="left:${s.x}%;top:${s.y}%"><i></i><span><b>${esc(s.label)}</b>${esc(val)}</span>${del}</div>`;
     });
     if (pick && !spotDraft) {
       const v = pick.value == null ? "…" : `${pick.value.toFixed(1)} °C`;
@@ -431,16 +433,54 @@ window.PAGE_POLLS = true; // tells controls.js this page fetches the state itsel
     if (!spotDraft) renderSpots();
   }
 
+  // Editing spots. Everything is decided on pointerdown (and from our own flags), never from the
+  // target of a later click/double-click: while a dot is dragged the overlay captures the pointer,
+  // so the browser sends those events to the overlay, not the dot (why double-click never worked).
+  const nameBox = $("#spot-name");
+  function selectSpot(i) {                 // the selected spot's name is edited in the bar under the image
+    spotSel = i;
+    const s = i === null ? null : spotDraft[i];
+    $("#spot-hint").hidden = !!s;
+    nameBox.hidden = !s;
+    $("#spot-del").hidden = !s;
+    if (s) nameBox.value = s.label;
+  }
+  function deleteSpot(i) {
+    spotDraft.splice(i, 1);
+    spotDrag = null;
+    selectSpot(null);
+    renderSpots();
+  }
+  nameBox.oninput = () => {
+    if (!spotDraft || spotSel === null) return;
+    spotDraft[spotSel].label = nameBox.value.slice(0, 40);
+    renderSpots();
+  };
+  nameBox.onkeydown = (e) => { if (e.key === "Enter") nameBox.blur(); };
+  $("#spot-del").onclick = () => { if (spotDraft && spotSel !== null) deleteSpot(spotSel); };
+
   overlay.addEventListener("pointerdown", (e) => {
+    const btn = e.target.closest("button");
+    if (btn) {                             // a ✕: act now, and ignore the click that follows
+      skipClick = true;
+      if (btn.dataset.del !== undefined && spotDraft) deleteSpot(Number(btn.dataset.del));
+      else { pick = null; renderSpots(); }
+      return;
+    }
+    skipClick = false;
     downOnSpot = !!e.target.closest(".spot");
     if (!spotDraft || !downOnSpot) return;
     e.preventDefault();
     spotDrag = Number(e.target.closest(".spot").dataset.i);
     spotMoved = false;
+    dragFrom = { x: e.clientX, y: e.clientY };
+    selectSpot(spotDrag);
+    renderSpots();
     overlay.setPointerCapture(e.pointerId);
   });
   overlay.addEventListener("pointermove", (e) => {
     if (spotDrag === null) return;
+    if (!spotMoved && Math.hypot(e.clientX - dragFrom.x, e.clientY - dragFrom.y) < 4) return;   // a shaky click is not a drag
     Object.assign(spotDraft[spotDrag], pctOf(e));
     spotMoved = true;
     renderSpots();
@@ -450,34 +490,25 @@ window.PAGE_POLLS = true; // tells controls.js this page fetches the state itsel
   overlay.addEventListener("pointercancel", endSpotDrag);
 
   overlay.addEventListener("click", (e) => {
-    if (e.target.closest("[data-unpick]")) { pick = null; renderSpots(); return; }
+    if (skipClick) { skipClick = false; return; }
     const onSpot = downOnSpot;
     downOnSpot = false;
-    if (spotDraft) {                       // editing: click on empty image = new spot
-      if (onSpot || spotMoved) { spotMoved = false; return; }
-      const cam = camSensorId();
+    if (spotDraft) {
+      if (spotMoved) { spotMoved = false; return; }                       // end of a drag
+      if (onSpot) { nameBox.focus(); nameBox.select(); return; }          // click on a spot = rename it
+      const cam = camSensorId();                                          // click on empty image = new spot
       if (spotList().filter(s => s.camera !== cam).length + spotDraft.length >= 8) return toast("Up to 8 spots per asset", true);
       const used = new Set(spotDraft.map(s => s.id));
       const id = [1, 2, 3, 4, 5, 6, 7, 8].find(n => !used.has(n));
       spotDraft.push({ id, camera: cam, label: `Spot ${id}`, ...pctOf(e) });
+      selectSpot(spotDraft.length - 1);
       renderSpots();
       return;
     }
-    if (onSpot && !e.target.closest(".pick")) return;   // clicking a saved spot does nothing
+    if (onSpot) return;                    // clicking a saved spot or the readout does nothing
     pick = { ...pctOf(e), value: null };
     renderSpots();
     updatePick();
-  });
-  overlay.addEventListener("dblclick", (e) => {
-    if (!spotDraft) return;
-    const el = e.target.closest(".spot");
-    if (!el) return;
-    const i = Number(el.dataset.i);
-    const name = prompt("Spot name (leave empty to delete this spot):", spotDraft[i].label);
-    if (name === null) return;
-    if (!name.trim()) spotDraft.splice(i, 1);
-    else spotDraft[i].label = name.trim().slice(0, 40);
-    renderSpots();
   });
 
   $("#spots-btn").onclick = () => {
@@ -486,6 +517,7 @@ window.PAGE_POLLS = true; // tells controls.js this page fetches the state itsel
     if (spotDraft) return;
     spotDraft = spotList().filter(s => s.camera === camSensorId()).map(s => ({ ...s }));
     pick = null;
+    selectSpot(null);
     overlay.classList.add("editing");
     $("#spot-bar").hidden = false;
     renderSpots();
@@ -493,6 +525,7 @@ window.PAGE_POLLS = true; // tells controls.js this page fetches the state itsel
   function endSpotEdit(redraw = true) {
     spotDraft = null;
     spotDrag = null;
+    spotSel = null;
     overlay.classList.remove("editing");
     $("#spot-bar").hidden = true;
     if (redraw) renderSpots();
@@ -500,7 +533,7 @@ window.PAGE_POLLS = true; // tells controls.js this page fetches the state itsel
   $("#spots-cancel").onclick = () => endSpotEdit();
   $("#spots-save").onclick = async () => {
     const cam = camSensorId();
-    const mine = spotDraft.map(s => ({ ...s, x: Math.round(s.x * 10) / 10, y: Math.round(s.y * 10) / 10 }));
+    const mine = spotDraft.map(s => ({ ...s, label: s.label.trim() || `Spot ${s.id}`, x: Math.round(s.x * 10) / 10, y: Math.round(s.y * 10) / 10 }));
     const spots = [...spotList().filter(s => s.camera !== cam), ...mine];
     try {
       await api("PUT", `/api/assets/${encodeURIComponent(asset.id)}`, { ...asset, spots });

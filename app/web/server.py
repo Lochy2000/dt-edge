@@ -70,6 +70,8 @@ def render_frame(data: np.ndarray, lo: float, hi: float, smooth: bool) -> bytes:
 
 def create_app(store, assets, recorder, calibration, spots=None) -> Flask:
     app = Flask(__name__)
+    # browsers must re-check the dashboard's .js/.css on every load, so a git pull is never hidden by an old cached copy
+    app.config["SEND_FILE_MAX_AGE_DEFAULT"] = 0
 
     def asset_changed():
         """The active asset (or its settings) changed: apply its camera ranges and spots now."""

@@ -58,7 +58,9 @@
           <!-- click = temperature at that point; camera spots (cam-overlay is placed over the image itself) -->
           <div class="cam-overlay" id="cam-overlay" title="Click for the temperature at that point"></div>
           <div class="spot-bar" id="spot-bar" hidden>
-            <span>Click to add a spot · drag to move · double-click to rename or delete</span>
+            <span id="spot-hint">Click the image to add a spot · drag a spot to move · click a spot to rename · ✕ to delete</span>
+            <input id="spot-name" type="text" maxlength="40" placeholder="Spot name" title="Name of the selected spot" hidden>
+            <button class="btn small ghost" id="spot-del" type="button" hidden>Delete</button>
             <button class="btn small primary" id="spots-save" type="button">Save</button>
             <button class="btn small ghost" id="spots-cancel" type="button">Cancel</button>
           </div>

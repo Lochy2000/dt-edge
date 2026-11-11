@@ -1,12 +1,17 @@
 # Changelog
 
+## 2026-11-11 — Spot editing fixed (rename / delete)
+- **Spots** on the thermal panel: every spot now has a **✕** above it to delete (same as the click readout). Click a spot to select it: its name appears in a text box in the bar under the image, with a **Delete** button. New spots are selected straight away so they can be named. Save / Cancel as before.
+- **Double-click removed.** It never worked: pressing a spot makes the overlay capture the pointer (needed for dragging), so the browser sent the double-click to the overlay, not the spot, and the code ignored it. The new code decides everything on pointer-down instead of from the click target. A press that moves less than 4 px counts as a click, not a drag.
+- Static files (`.js`, `.css`) are now always re-checked by the browser (`SEND_FILE_MAX_AGE_DEFAULT = 0`), so an old cached script can't hide an update.
+
 ## 2026-11-08 — Test rig profile (fan matrix test)
 - **Test rig** profile (`assets_default/test-rig.json`), picked in the asset dropdown next to Kettle. Built-in profiles missing from `data/assets/` are now copied in at start-up (before, only when there were no profiles at all), so it appears after `git pull`. The kettle is unchanged.
 - **Camera comparison panel** (asset `"panel": "compare"`) replaces Power & energy: max & mean per camera, or min vs room air; tiles show the gap between the first two cameras. Details ↗ works for it.
 - **Fan matrix drawing** (`drawing: "matrix"`) with up to 8 draggable thermocouple dots; the fans turn slowly while recording.
 - **Colour range** on the thermal panel: Auto or fixed min/max, saved per asset and camera (`camera_scale`), applied immediately (`Store.set_scale`). Display only.
 - **Click the thermal image** for the temperature under the pointer (`GET /api/frame/<id>/at?x=&y=`, % of the image; 3 x 3 pixel mean on the Lepton).
-- **Camera spots** (`app/spots.py`, asset `spots`): fixed points on a thermal image, read every frame and fed to the store as `<camera>.spot<n>`, so they show in Thermal response (dashed), `/api/state` and recordings. Edit with **Spots** on the thermal panel.
+- **Camera spots** (`app/spots.py`, asset `spots`): fixed points on a thermal image, read every frame and fed to the store as `<camera>.spot<n>`, so they show in Thermal response (dashed), `/api/state` and recordings. Edit with **Spots** on the thermal panel: click the image to add, drag a dot to move, click a name to rename, ✕ to delete (double-click didn't work: the dragged pointer is captured by the overlay, so the browser sends clicks there).
 - Graphs can show **2 h / 3 h** (history kept for 180 min); recordings auto-stop after **12 h** (was 6).
 - `demo.yaml`: second simulated camera (`mlx`) so the comparison works without hardware.
 - **`sensors.local.yaml`** (not in Git, `app/config.py`): this Pi's own changes to `sensors.yaml`, listed by sensor id (e.g. `plug: {enabled: false}`), so editing settings on the Pi no longer blocks `git pull`. Example in `sensors.local.example.yaml`.
